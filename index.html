@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 
 :root{
@@ -205,12 +206,57 @@ main{padding:14px 16px 8px;}
 .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:20px;font-size:12.5px;z-index:80;box-shadow:0 6px 16px rgba(0,0,0,0.25);}
 .toast.hidden{display:none;}
 
+/* LOCK / LOADING / USER SCREENS */
+.hidden{display:none !important;}
+.lock-screen{position:fixed;inset:0;background:#000000;color:#fff;display:flex;align-items:center;justify-content:center;z-index:100;padding:24px;}
+.lock-box{width:100%;max-width:320px;text-align:center;}
+.lock-title{font-size:22px;font-weight:700;margin-bottom:6px;}
+.lock-sub{font-size:13px;color:#aaaaaa;margin-bottom:20px;}
+.pin-input{width:100%;padding:14px;border-radius:12px;border:1px solid #333;background:#111;color:#fff;font-size:20px;text-align:center;letter-spacing:4px;margin-bottom:12px;box-sizing:border-box;}
+.lock-screen .btn-primary{background:#fff;color:#000;}
+.pin-error{color:#ff8a80;font-size:12px;margin-top:10px;}
+.user-buttons{display:flex;flex-direction:column;gap:10px;}
+.user-select-btn{padding:14px;border-radius:12px;border:1.5px solid #fff;background:transparent;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;}
+.user-select-btn:active{background:#fff;color:#000;}
+
+/* RECORDED-BY chips */
+.user-chip-row{display:flex;gap:8px;flex-wrap:wrap;}
+.user-chip-btn{padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);font-family:inherit;font-size:12.5px;cursor:pointer;color:var(--text);}
+.user-chip-btn.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.by-tag{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:1px 6px;font-size:9.5px;color:var(--text);}
+
 ::-webkit-scrollbar{width:0px;height:0px;}
 
 </style>
 </head>
 <body>
-<div id="app">
+
+<div id="loadingScreen" class="lock-screen">
+  <div class="lock-box">
+    <div class="lock-title">Kelly Jod</div>
+    <div class="lock-sub">Loading…</div>
+  </div>
+</div>
+
+<div id="lockScreen" class="lock-screen hidden">
+  <div class="lock-box">
+    <div class="lock-title">Kelly Jod</div>
+    <div class="lock-sub">Enter PIN to continue</div>
+    <input id="pinInput" type="password" inputmode="numeric" class="pin-input" placeholder="PIN">
+    <button id="btnUnlock" class="btn-primary">Unlock</button>
+    <div id="pinError" class="pin-error hidden">Incorrect PIN, try again</div>
+  </div>
+</div>
+
+<div id="userScreen" class="lock-screen hidden">
+  <div class="lock-box">
+    <div class="lock-title">Who's this?</div>
+    <div class="lock-sub">Select your name so entries are tagged correctly</div>
+    <div id="userButtons" class="user-buttons"></div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
 
   <header id="topbar">
     <div class="topbar-inner">
@@ -378,6 +424,25 @@ main{padding:14px 16px 8px;}
       </div>
 
       <div class="settings-block">
+        <div class="settings-head">People</div>
+        <div id="userList" class="chip-list"></div>
+        <div class="add-row">
+          <input id="newUser" type="text" placeholder="Add a person's name">
+          <button class="btn-small" data-add="user">Add</button>
+        </div>
+        <div class="field-label" style="margin-top:10px;">Currently using as: <b id="activeUserLabel">-</b></div>
+        <button id="btnSwitchUser" class="btn-secondary" style="margin-top:8px;">Switch Person</button>
+      </div>
+
+      <div class="settings-block">
+        <div class="settings-head">Security</div>
+        <label class="field-label">Change shared PIN</label>
+        <input id="pinInputSettings" type="text" inputmode="numeric" placeholder="New PIN">
+        <button id="btnChangePin" class="btn-secondary">Update PIN</button>
+        <button id="btnLock" class="btn-secondary">Lock App Now</button>
+      </div>
+
+      <div class="settings-block">
         <div class="settings-head">Data</div>
         <button id="btnExportCsv" class="btn-secondary">Export as CSV</button>
         <button id="btnExportJson" class="btn-secondary">Backup Data (JSON)</button>
@@ -389,7 +454,7 @@ main{padding:14px 16px 8px;}
 
       <div class="settings-block about-block">
         <div class="settings-head">About This App</div>
-        <p>Kelly Jod was built for MABC Roastco to track full income and expenses, with a calendar, budgets, tags, analytics, and voice input. All data stays on this device only (localStorage) — nothing is sent anywhere.</p>
+        <p>Kelly Jod was built for MABC Roastco to track full income and expenses, with a calendar, budgets, tags, analytics, and voice input. Data syncs live across devices via a shared database — everyone using the app sees the same up-to-date numbers. The PIN is a convenience lock, not strong security; don't use this for anything beyond small-team bookkeeping.</p>
       </div>
     </section>
 
@@ -466,6 +531,11 @@ main{padding:14px 16px 8px;}
       </div>
     </div>
 
+    <div class="form-row">
+      <label>Recorded by</label>
+      <div id="fRecordedBy" class="user-chip-row"></div>
+    </div>
+
     <div class="modal-actions">
       <button id="btnDelete" class="btn-danger hidden">Delete</button>
       <div class="modal-actions-row">
@@ -479,24 +549,30 @@ main{padding:14px 16px 8px;}
 <div id="toast" class="toast hidden"></div>
 
 <script>
-/* ===================== Kelly Jod — App Logic ===================== */
+/* ===================== Kelly Jod — App Logic (Supabase-backed, multi-user sync) ===================== */
 
-const STORAGE_KEY = 'kellyjod_v1';
+const SUPABASE_URL = 'https://zpyakptdmiegisaqhusy.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpweWFrcHRkbWllZ2lzYXFodXN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0OTA2NzYsImV4cCI6MjA5OTA2NjY3Nn0.fpyrEpIhe02rVQURiJ88DuQaS7wwDcVzvIYk3e_mdyg';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const LOCAL_UNLOCK_KEY = 'kellyjod_unlocked_v1';
+const LOCAL_USER_KEY = 'kellyjod_user_v1';
+
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const MONTHS_FULL = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
 const DEFAULT_EXPENSE_CATS = ["Coffee Beans / Ingredients","Packaging","Booth / Site Rental","Transportation","Staff Wages","Marketing / Advertising","Fuel / Travel","Equipment / Maintenance","Fees","Other"];
 const DEFAULT_ACCOUNTS = ["Cash","Bank Account","Credit Card"];
 
-let SEED_DATA = []; // filled by placeholder below
-SEED_DATA = [{"id": "seed-1", "date": "2025-08-01", "time": "14:19", "type": "income", "category": "Robinson Latkrabang", "tags": [], "amount": 2250.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-2", "date": "2025-08-01", "time": "14:22", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6231.17, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-3", "date": "2025-08-02", "time": "14:23", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8792.32, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-4", "date": "2025-08-02", "time": "14:23", "type": "income", "category": "Robinson Latkrabang", "tags": [], "amount": 10210.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-5", "date": "2025-08-02", "time": "14:24", "type": "income", "category": "Sathaneepak", "tags": [], "amount": 6042.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-6", "date": "2025-08-03", "time": "13:48", "type": "income", "category": "Sathaneepak", "tags": [], "amount": 6990.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-7", "date": "2025-08-03", "time": "13:49", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8212.9, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-8", "date": "2025-08-03", "time": "13:55", "type": "income", "category": "Robinson Latkrabang", "tags": [], "amount": 11539.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-9", "date": "2025-08-04", "time": "14:01", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2086.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-10", "date": "2025-08-05", "time": "14:02", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3691.6, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-11", "date": "2025-08-06", "time": "14:02", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5151.72, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-12", "date": "2025-08-07", "time": "14:02", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4301.95, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-13", "date": "2025-08-07", "time": "15:16", "type": "income", "category": "The mall Bangkae", "tags": [], "amount": 6235.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-14", "date": "2025-08-08", "time": "14:03", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5471.3, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-15", "date": "2025-08-08", "time": "22:28", "type": "income", "category": "The mall Bangkae", "tags": [], "amount": 8507.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-16", "date": "2025-08-09", "time": "14:34", "type": "income", "category": "The mall Bangkae", "tags": [], "amount": 9337.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-17", "date": "2025-08-09", "time": "14:35", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5577.9, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-18", "date": "2025-08-09", "time": "14:35", "type": "income", "category": "Event JoinXSpace", "tags": [], "amount": 1900.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-19", "date": "2025-08-10", "time": "12:50", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8337.85, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-20", "date": "2025-08-10", "time": "15:42", "type": "income", "category": "The mall Bangkae", "tags": [], "amount": 13625.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-21", "date": "2025-08-11", "time": "14:57", "type": "income", "category": "The mall Bangkae", "tags": [], "amount": 12709.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-22", "date": "2025-08-11", "time": "14:57", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5354.85, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-23", "date": "2025-08-12", "time": "17:21", "type": "income", "category": "The mall Bangkae", "tags": [], "amount": 10763.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-24", "date": "2025-08-12", "time": "17:25", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 12390.65, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-25", "date": "2025-08-13", "time": "12:25", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4862.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-26", "date": "2025-08-14", "time": "12:24", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6143.3, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-27", "date": "2025-08-15", "time": "15:37", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5071.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-28", "date": "2025-08-15", "time": "15:40", "type": "income", "category": "Cup & Craft Carnival", "tags": [], "amount": 1802.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-29", "date": "2025-08-16", "time": "14:28", "type": "income", "category": "Cup & Craft Carnival", "tags": [], "amount": 6701.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-30", "date": "2025-08-16", "time": "14:28", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5630.55, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-31", "date": "2025-08-17", "time": "15:03", "type": "income", "category": "Cup & Craft Carnival", "tags": [], "amount": 7006.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-32", "date": "2025-08-17", "time": "15:04", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 9802.95, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-33", "date": "2025-08-18", "time": "11:50", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 12094.05, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-34", "date": "2025-08-18", "time": "11:52", "type": "income", "category": "Government Complex Building B", "tags": [], "amount": 7378.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-35", "date": "2025-08-19", "time": "11:28", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 33287.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-36", "date": "2025-08-19", "time": "13:25", "type": "income", "category": "Government Complex Building B", "tags": [], "amount": 9489.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-37", "date": "2025-08-20", "time": "12:09", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4520.7, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-38", "date": "2025-08-20", "time": "12:09", "type": "income", "category": "Government Complex Building B", "tags": [], "amount": 11135.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-39", "date": "2025-08-21", "time": "13:05", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 9188.1, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-40", "date": "2025-08-21", "time": "13:07", "type": "income", "category": "Government Complex Building B", "tags": [], "amount": 8502.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-41", "date": "2025-08-22", "time": "03:13", "type": "income", "category": "Government Complex Building B", "tags": [], "amount": 12108.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-42", "date": "2025-08-22", "time": "15:43", "type": "income", "category": "Ro. Chachoengsao", "tags": [], "amount": 4492.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-43", "date": "2025-08-22", "time": "15:44", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4541.7, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-44", "date": "2025-08-23", "time": "15:17", "type": "income", "category": "Ro. Chachoengsao", "tags": [], "amount": 5759.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-45", "date": "2025-08-23", "time": "15:18", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 9998.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-46", "date": "2025-08-24", "time": "15:53", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 10693.85, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-47", "date": "2025-08-24", "time": "15:53", "type": "income", "category": "Ro. Chachoengsao", "tags": [], "amount": 8991.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-48", "date": "2025-08-25", "time": "13:07", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6443.45, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-49", "date": "2025-08-25", "time": "13:30", "type": "income", "category": "Coffee Consulting", "tags": [], "amount": 15000.0, "note": "Phusara Hill", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-50", "date": "2025-08-26", "time": "11:32", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 13041.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-51", "date": "2025-08-27", "time": "12:27", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4649.77, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-52", "date": "2025-08-28", "time": "14:27", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5828.13, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-53", "date": "2025-08-29", "time": "13:21", "type": "income", "category": "Robinson Roi Et", "tags": [], "amount": 6733.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-54", "date": "2025-08-29", "time": "13:21", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 14098.24, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-55", "date": "2025-08-30", "time": "12:39", "type": "income", "category": "Ayutthaya morning.d", "tags": [], "amount": 4907.25, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-56", "date": "2025-08-30", "time": "12:40", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6509.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-57", "date": "2025-08-30", "time": "12:43", "type": "income", "category": "Robinson Roi Et", "tags": [], "amount": 9727.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-58", "date": "2025-08-31", "time": "13:32", "type": "income", "category": "Robinson Roi Et", "tags": [], "amount": 9550.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-59", "date": "2025-08-31", "time": "13:33", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 9661.9, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-60", "date": "2025-08-31", "time": "13:56", "type": "income", "category": "Ayutthaya morning.d", "tags": [], "amount": 4430.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-61", "date": "2025-08-31", "time": "14:35", "type": "income", "category": "Competition Reward", "tags": [], "amount": 15000.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-62", "date": "2025-09-01", "time": "23:51", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7545.45, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-63", "date": "2025-09-02", "time": "10:17", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3757.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-64", "date": "2025-09-03", "time": "17:14", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3177.9, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-65", "date": "2025-09-04", "time": "17:13", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3672.35, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-66", "date": "2025-09-05", "time": "10:19", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4064.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-67", "date": "2025-09-06", "time": "11:41", "type": "income", "category": "Sathaneepak", "tags": [], "amount": 4642.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-68", "date": "2025-09-06", "time": "11:42", "type": "income", "category": "Run Krabi", "tags": [], "amount": 11058.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-69", "date": "2025-09-06", "time": "11:43", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 10038.57, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-70", "date": "2025-09-07", "time": "10:24", "type": "income", "category": "Run Krabi", "tags": [], "amount": 10840.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-71", "date": "2025-09-07", "time": "10:24", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6501.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-72", "date": "2025-09-07", "time": "11:09", "type": "income", "category": "Sathaneepak", "tags": [], "amount": 2393.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-73", "date": "2025-09-08", "time": "12:09", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6054.07, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-74", "date": "2025-09-09", "time": "13:14", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5942.9, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-75", "date": "2025-09-10", "time": "11:34", "type": "income", "category": "Brew&Groove", "tags": [], "amount": 2617.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-76", "date": "2025-09-10", "time": "11:35", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4220.7, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-77", "date": "2025-09-11", "time": "13:38", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3793.77, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-78", "date": "2025-09-11", "time": "13:38", "type": "income", "category": "Brew&Groove", "tags": [], "amount": 5514.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-79", "date": "2025-09-11", "time": "13:39", "type": "income", "category": "Promanade", "tags": [], "amount": 5865.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-80", "date": "2025-09-12", "time": "14:51", "type": "income", "category": "Promanade", "tags": [], "amount": 9416.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-81", "date": "2025-09-12", "time": "14:52", "type": "income", "category": "Brew&Groove", "tags": [], "amount": 3275.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-82", "date": "2025-09-12", "time": "14:54", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7951.45, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-83", "date": "2025-09-13", "time": "13:58", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 17078.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-84", "date": "2025-09-13", "time": "13:59", "type": "income", "category": "Brew&Groove", "tags": [], "amount": 3721.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-85", "date": "2025-09-13", "time": "14:00", "type": "income", "category": "Promanade", "tags": [], "amount": 10944.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-86", "date": "2025-09-14", "time": "11:00", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5650.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-87", "date": "2025-09-14", "time": "12:52", "type": "income", "category": "Promanade", "tags": [], "amount": 13333.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-88", "date": "2025-09-14", "time": "13:05", "type": "income", "category": "Brew&Groove", "tags": [], "amount": 5222.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-89", "date": "2025-09-15", "time": "13:23", "type": "income", "category": "Promanade", "tags": [], "amount": 7180.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-90", "date": "2025-09-15", "time": "13:23", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4373.75, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-91", "date": "2025-09-15", "time": "14:20", "type": "income", "category": "Brew&Groove", "tags": [], "amount": 2503.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-92", "date": "2025-09-16", "time": "12:56", "type": "income", "category": "Promanade", "tags": [], "amount": 4102.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-93", "date": "2025-09-16", "time": "12:57", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5719.78, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-94", "date": "2025-09-16", "time": "14:31", "type": "income", "category": "Brew&Groove", "tags": [], "amount": 2871.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-95", "date": "2025-09-17", "time": "12:47", "type": "income", "category": "Promanade", "tags": [], "amount": 6005.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-96", "date": "2025-09-17", "time": "12:48", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4581.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-97", "date": "2025-09-17", "time": "13:19", "type": "income", "category": "Brew&Groove", "tags": [], "amount": 741.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-98", "date": "2025-09-18", "time": "13:22", "type": "income", "category": "Promanade", "tags": [], "amount": 2417.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-99", "date": "2025-09-18", "time": "13:22", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3421.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-100", "date": "2025-09-19", "time": "13:54", "type": "income", "category": "Promanade", "tags": [], "amount": 4334.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-101", "date": "2025-09-19", "time": "13:54", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4005.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-102", "date": "2025-09-20", "time": "14:57", "type": "income", "category": "Promanade", "tags": [], "amount": 11688.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-103", "date": "2025-09-20", "time": "14:57", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4918.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-104", "date": "2025-09-21", "time": "13:31", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5753.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-105", "date": "2025-09-21", "time": "15:34", "type": "income", "category": "Promanade", "tags": [], "amount": 13485.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-106", "date": "2025-09-22", "time": "15:14", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 11366.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-107", "date": "2025-09-23", "time": "13:14", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 14070.28, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-108", "date": "2025-09-24", "time": "12:54", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 13049.75, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-109", "date": "2025-09-25", "time": "13:33", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7530.6, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-110", "date": "2025-09-26", "time": "10:42", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7384.9, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-111", "date": "2025-09-27", "time": "14:45", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7780.75, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-112", "date": "2025-09-28", "time": "11:59", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 10741.26, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-113", "date": "2025-09-29", "time": "13:34", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4491.5, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-114", "date": "2025-09-30", "time": "13:24", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7092.7, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-115", "date": "2025-10-01", "time": "12:56", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6531.64, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-116", "date": "2025-10-02", "time": "12:57", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4924.4, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-117", "date": "2025-10-03", "time": "12:58", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3294.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-118", "date": "2025-10-03", "time": "14:06", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 4817.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-119", "date": "2025-10-04", "time": "13:31", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4532.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-120", "date": "2025-10-04", "time": "14:21", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 8585.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-121", "date": "2025-10-05", "time": "10:58", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7494.6, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-122", "date": "2025-10-05", "time": "13:26", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 8912.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-123", "date": "2025-10-06", "time": "12:05", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6550.13, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-124", "date": "2025-10-06", "time": "12:45", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 4775.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-125", "date": "2025-10-07", "time": "12:37", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 4659.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-126", "date": "2025-10-07", "time": "12:38", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4214.4, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-127", "date": "2025-10-08", "time": "14:07", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 3350.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-128", "date": "2025-10-08", "time": "15:07", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 11293.1, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-129", "date": "2025-10-09", "time": "14:07", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4312.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-130", "date": "2025-10-09", "time": "14:08", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 4002.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-131", "date": "2025-10-10", "time": "13:55", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 6096.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-132", "date": "2025-10-10", "time": "13:56", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2718.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-133", "date": "2025-10-11", "time": "14:03", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7648.01, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-134", "date": "2025-10-11", "time": "14:21", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 7096.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-135", "date": "2025-10-12", "time": "14:21", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 10433.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-136", "date": "2025-10-12", "time": "14:21", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4598.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-137", "date": "2025-10-13", "time": "12:14", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4672.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-138", "date": "2025-10-13", "time": "12:15", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 6192.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-139", "date": "2025-10-14", "time": "13:20", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 2638.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-140", "date": "2025-10-14", "time": "13:22", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 15798.88, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-141", "date": "2025-10-15", "time": "10:25", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3005.3, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-142", "date": "2025-10-15", "time": "13:48", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 5109.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-143", "date": "2025-10-16", "time": "14:01", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 3328.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-144", "date": "2025-10-16", "time": "14:02", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2847.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-145", "date": "2025-10-17", "time": "11:15", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6234.41, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-146", "date": "2025-10-17", "time": "13:20", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 3103.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-147", "date": "2025-10-18", "time": "14:43", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 7385.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-148", "date": "2025-10-18", "time": "14:44", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5644.1, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-149", "date": "2025-10-18", "time": "14:56", "type": "income", "category": "Running Nakonayok", "tags": [], "amount": 5240.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-150", "date": "2025-10-19", "time": "05:28", "type": "income", "category": "Running Nakonayok", "tags": [], "amount": 9135.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-151", "date": "2025-10-19", "time": "10:19", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3861.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-152", "date": "2025-10-19", "time": "12:48", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 6280.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-153", "date": "2025-10-20", "time": "14:29", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 3586.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-154", "date": "2025-10-20", "time": "14:30", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8987.32, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-155", "date": "2025-10-21", "time": "10:54", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4752.32, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-156", "date": "2025-10-21", "time": "14:19", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 2462.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-157", "date": "2025-10-22", "time": "11:38", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4028.25, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-158", "date": "2025-10-22", "time": "13:15", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 4292.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-159", "date": "2025-10-23", "time": "15:34", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 9614.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-160", "date": "2025-10-23", "time": "15:36", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 12584.59, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-161", "date": "2025-10-24", "time": "11:48", "type": "income", "category": "Running Nakonpanom", "tags": [], "amount": 2130.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-162", "date": "2025-10-24", "time": "11:50", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4947.39, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-163", "date": "2025-10-24", "time": "14:09", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 3357.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-164", "date": "2025-10-25", "time": "12:04", "type": "income", "category": "Running Nakonpanom", "tags": [], "amount": 4020.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-165", "date": "2025-10-25", "time": "12:05", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4064.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-166", "date": "2025-10-25", "time": "12:55", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 6817.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-167", "date": "2025-10-26", "time": "04:08", "type": "income", "category": "Running Nakonpanom", "tags": [], "amount": 8200.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-168", "date": "2025-10-26", "time": "13:02", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7769.6, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-169", "date": "2025-10-26", "time": "23:08", "type": "income", "category": "Coffee Garden", "tags": [], "amount": 6506.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-170", "date": "2025-10-27", "time": "01:29", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3317.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-171", "date": "2025-10-28", "time": "12:55", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2726.3, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-172", "date": "2025-10-29", "time": "14:42", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5480.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-173", "date": "2025-10-29", "time": "14:43", "type": "income", "category": "Tower B", "tags": [], "amount": 5606.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-174", "date": "2025-10-30", "time": "10:26", "type": "income", "category": "Tower B", "tags": [], "amount": 7462.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-175", "date": "2025-10-30", "time": "10:26", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7896.5, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-176", "date": "2025-10-31", "time": "11:35", "type": "income", "category": "Tower B", "tags": [], "amount": 6511.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-177", "date": "2025-10-31", "time": "11:37", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6743.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-178", "date": "2025-10-31", "time": "15:06", "type": "income", "category": "Royal Blossom", "tags": [], "amount": 18992.5, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-179", "date": "2025-10-31", "time": "15:07", "type": "income", "category": "Mont fluer", "tags": [], "amount": 37450.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-180", "date": "2025-11-01", "time": "13:58", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6701.7, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-181", "date": "2025-11-02", "time": "12:19", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 13653.5, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-182", "date": "2025-11-03", "time": "14:16", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2756.42, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-183", "date": "2025-11-04", "time": "14:15", "type": "income", "category": "Pinklao", "tags": [], "amount": 5181.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-184", "date": "2025-11-04", "time": "14:16", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3049.65, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-185", "date": "2025-11-05", "time": "11:22", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6263.36, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-186", "date": "2025-11-05", "time": "13:47", "type": "income", "category": "Pinklao", "tags": [], "amount": 6910.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-187", "date": "2025-11-06", "time": "12:28", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8130.26, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-188", "date": "2025-11-06", "time": "14:31", "type": "income", "category": "Pinklao", "tags": [], "amount": 4952.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-189", "date": "2025-11-07", "time": "14:22", "type": "income", "category": "Pinklao", "tags": [], "amount": 7199.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-190", "date": "2025-11-07", "time": "14:22", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3254.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-191", "date": "2025-11-08", "time": "13:56", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6550.1, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-192", "date": "2025-11-08", "time": "14:37", "type": "income", "category": "Pinklao", "tags": [], "amount": 9467.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-193", "date": "2025-11-09", "time": "10:28", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6706.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-194", "date": "2025-11-09", "time": "15:52", "type": "income", "category": "Pinklao", "tags": [], "amount": 10467.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-195", "date": "2025-11-10", "time": "16:13", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3340.54, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-196", "date": "2025-11-10", "time": "16:14", "type": "income", "category": "Pinklao", "tags": [], "amount": 5538.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-197", "date": "2025-11-11", "time": "11:36", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7949.1, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-198", "date": "2025-11-12", "time": "12:51", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7460.5, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-199", "date": "2025-11-13", "time": "11:47", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2250.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-200", "date": "2025-11-14", "time": "13:42", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3920.7, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-201", "date": "2025-11-14", "time": "13:43", "type": "income", "category": "Fasion Island", "tags": [], "amount": 10043.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-202", "date": "2025-11-15", "time": "00:25", "type": "income", "category": "Fasion Island", "tags": [], "amount": 12232.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-203", "date": "2025-11-15", "time": "15:06", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2965.44, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-204", "date": "2025-11-16", "time": "10:19", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5429.7, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-205", "date": "2025-11-16", "time": "12:29", "type": "income", "category": "Fasion Island", "tags": [], "amount": 10718.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-206", "date": "2025-11-17", "time": "08:08", "type": "income", "category": "Tower B / 2", "tags": [], "amount": 9061.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-207", "date": "2025-11-17", "time": "14:27", "type": "income", "category": "Fasion Island", "tags": [], "amount": 3993.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-208", "date": "2025-11-17", "time": "14:27", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6315.85, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-209", "date": "2025-11-18", "time": "08:59", "type": "income", "category": "Tower B / 2", "tags": [], "amount": 11087.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-210", "date": "2025-11-18", "time": "12:33", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5028.25, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-211", "date": "2025-11-18", "time": "14:26", "type": "income", "category": "Fasion Island", "tags": [], "amount": 3644.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-212", "date": "2025-11-19", "time": "07:39", "type": "income", "category": "Tower B / 2", "tags": [], "amount": 12574.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-213", "date": "2025-11-19", "time": "11:32", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3509.28, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-214", "date": "2025-11-19", "time": "14:06", "type": "income", "category": "Fasion Island", "tags": [], "amount": 4122.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-215", "date": "2025-11-20", "time": "07:45", "type": "income", "category": "Tower B / 2", "tags": [], "amount": 9949.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-216", "date": "2025-11-20", "time": "11:31", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 1874.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-217", "date": "2025-11-20", "time": "14:41", "type": "income", "category": "Fasion Island", "tags": [], "amount": 2167.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-218", "date": "2025-11-21", "time": "13:33", "type": "income", "category": "Tower B / 2", "tags": [], "amount": 13358.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-219", "date": "2025-11-21", "time": "13:34", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2456.32, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-220", "date": "2025-11-21", "time": "23:06", "type": "income", "category": "Fasion Island", "tags": [], "amount": 2032.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-221", "date": "2025-11-22", "time": "10:55", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6751.45, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-222", "date": "2025-11-22", "time": "13:52", "type": "income", "category": "Fasion Island", "tags": [], "amount": 14472.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-223", "date": "2025-11-23", "time": "15:29", "type": "income", "category": "Fasion Island", "tags": [], "amount": 11797.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-224", "date": "2025-11-23", "time": "15:31", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5459.98, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-225", "date": "2025-11-24", "time": "12:22", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4799.1, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-226", "date": "2025-11-25", "time": "23:43", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5332.5, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-227", "date": "2025-11-26", "time": "14:17", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5863.44, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-228", "date": "2025-11-27", "time": "11:43", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3818.75, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-229", "date": "2025-11-28", "time": "11:20", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4077.4, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-230", "date": "2025-11-29", "time": "14:55", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3807.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-231", "date": "2025-11-29", "time": "15:05", "type": "income", "category": "Central Ubon", "tags": [], "amount": 20199.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-232", "date": "2025-11-30", "time": "10:40", "type": "income", "category": "Allianz world run", "tags": [], "amount": 21229.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-233", "date": "2025-11-30", "time": "10:41", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 10006.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-234", "date": "2025-11-30", "time": "13:20", "type": "income", "category": "Central Ubon", "tags": [], "amount": 22952.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-235", "date": "2025-12-01", "time": "12:52", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2922.21, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-236", "date": "2025-12-01", "time": "12:57", "type": "income", "category": "Central Ubon", "tags": [], "amount": 11250.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-237", "date": "2025-12-02", "time": "12:42", "type": "income", "category": "Central Ubon", "tags": [], "amount": 6111.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-238", "date": "2025-12-02", "time": "12:43", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4006.05, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-239", "date": "2025-12-03", "time": "00:20", "type": "income", "category": "Central Ubon", "tags": [], "amount": 12095.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-240", "date": "2025-12-03", "time": "00:21", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6322.19, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-241", "date": "2025-12-04", "time": "11:33", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3855.1, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-242", "date": "2025-12-04", "time": "13:27", "type": "income", "category": "Central Ubon", "tags": [], "amount": 10968.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-243", "date": "2025-12-04", "time": "14:26", "type": "income", "category": "Coffee fest", "tags": [], "amount": 13158.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-244", "date": "2025-12-05", "time": "11:16", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5494.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-245", "date": "2025-12-05", "time": "13:19", "type": "income", "category": "Central Ubon", "tags": [], "amount": 13006.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-246", "date": "2025-12-05", "time": "15:39", "type": "income", "category": "Coffee fest", "tags": [], "amount": 14366.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-247", "date": "2025-12-06", "time": "13:11", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5816.87, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-248", "date": "2025-12-06", "time": "13:13", "type": "income", "category": "Central Ubon", "tags": [], "amount": 11200.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-249", "date": "2025-12-06", "time": "13:58", "type": "income", "category": "Coffee fest", "tags": [], "amount": 15947.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-250", "date": "2025-12-07", "time": "13:06", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4553.66, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-251", "date": "2025-12-07", "time": "13:06", "type": "income", "category": "Central Ubon", "tags": [], "amount": 16390.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-252", "date": "2025-12-07", "time": "13:57", "type": "income", "category": "Coffee fest", "tags": [], "amount": 13081.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-253", "date": "2025-12-08", "time": "13:53", "type": "income", "category": "Central Ubon", "tags": [], "amount": 7140.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-254", "date": "2025-12-08", "time": "13:55", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8129.9, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-255", "date": "2025-12-09", "time": "04:20", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 9639.42, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-256", "date": "2025-12-10", "time": "04:20", "type": "income", "category": "19 x Kelly", "tags": [], "amount": 16000.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-257", "date": "2025-12-10", "time": "12:07", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7331.3, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-258", "date": "2025-12-11", "time": "16:05", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 11856.33, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-259", "date": "2025-12-12", "time": "16:06", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2669.1, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-260", "date": "2025-12-12", "time": "16:07", "type": "income", "category": "Central Chengwatana", "tags": [], "amount": 6760.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-261", "date": "2025-12-13", "time": "16:34", "type": "income", "category": "Central Chengwatana", "tags": [], "amount": 4681.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-262", "date": "2025-12-13", "time": "16:35", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2738.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-263", "date": "2025-12-14", "time": "14:35", "type": "income", "category": "Central Chengwatana", "tags": [], "amount": 9843.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-264", "date": "2025-12-14", "time": "14:36", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7058.74, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-265", "date": "2025-12-15", "time": "13:17", "type": "income", "category": "Central Chengwatana", "tags": [], "amount": 5146.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-266", "date": "2025-12-15", "time": "13:18", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2772.9, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-267", "date": "2025-12-16", "time": "12:11", "type": "income", "category": "Central Chengwatana", "tags": [], "amount": 9510.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-268", "date": "2025-12-16", "time": "12:12", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5019.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-269", "date": "2025-12-17", "time": "15:35", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2061.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-270", "date": "2025-12-17", "time": "15:35", "type": "income", "category": "Central Chengwatana", "tags": [], "amount": 740.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-271", "date": "2025-12-18", "time": "14:58", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 9072.1, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-272", "date": "2025-12-19", "time": "14:59", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8284.6, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-273", "date": "2025-12-20", "time": "15:00", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 10516.66, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-274", "date": "2025-12-20", "time": "15:01", "type": "income", "category": "Central Phuket", "tags": [], "amount": 20405.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-275", "date": "2025-12-21", "time": "14:35", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8053.4, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-276", "date": "2025-12-21", "time": "14:52", "type": "income", "category": "Central Phuket", "tags": [], "amount": 27056.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-277", "date": "2025-12-22", "time": "14:39", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5044.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-278", "date": "2025-12-22", "time": "14:40", "type": "income", "category": "Central Phuket", "tags": [], "amount": 16680.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-279", "date": "2025-12-23", "time": "14:18", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2877.4, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-280", "date": "2025-12-23", "time": "14:18", "type": "income", "category": "Central Phuket", "tags": [], "amount": 14172.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-281", "date": "2025-12-24", "time": "15:12", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2901.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-282", "date": "2025-12-24", "time": "15:13", "type": "income", "category": "Central Phuket", "tags": [], "amount": 14174.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-283", "date": "2025-12-25", "time": "15:00", "type": "income", "category": "Central Phuket", "tags": [], "amount": 14892.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-284", "date": "2025-12-25", "time": "15:01", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4735.6, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-285", "date": "2025-12-26", "time": "15:25", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5468.15, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-286", "date": "2025-12-26", "time": "17:31", "type": "income", "category": "Central Phuket", "tags": [], "amount": 11189.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-287", "date": "2025-12-27", "time": "12:53", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3312.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-288", "date": "2025-12-28", "time": "12:43", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5274.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-289", "date": "2025-12-29", "time": "12:42", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3628.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-290", "date": "2025-12-30", "time": "14:23", "type": "income", "category": "Central Surat thani", "tags": [], "amount": 18752.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-291", "date": "2025-12-30", "time": "14:23", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2651.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-292", "date": "2025-12-31", "time": "14:37", "type": "income", "category": "Central Surat thani", "tags": [], "amount": 16056.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-293", "date": "2025-12-31", "time": "14:38", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6559.6, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-294", "date": "2026-01-01", "time": "14:13", "type": "income", "category": "Central Surat thani", "tags": [], "amount": 16811.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-295", "date": "2026-01-02", "time": "14:35", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 14161.5, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-296", "date": "2026-01-02", "time": "14:41", "type": "income", "category": "Central Surat thani", "tags": [], "amount": 16690.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-297", "date": "2026-01-03", "time": "14:08", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6623.24, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-298", "date": "2026-01-03", "time": "14:09", "type": "income", "category": "Central Surat thani", "tags": [], "amount": 15615.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-299", "date": "2026-01-04", "time": "13:58", "type": "income", "category": "Central Surat thani", "tags": [], "amount": 14705.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-300", "date": "2026-01-04", "time": "13:59", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7714.44, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-301", "date": "2026-01-05", "time": "14:56", "type": "income", "category": "Central Surat thani", "tags": [], "amount": 12112.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-302", "date": "2026-01-05", "time": "14:56", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 9354.6, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-303", "date": "2026-01-06", "time": "12:46", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2499.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-304", "date": "2026-01-07", "time": "11:38", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6856.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-305", "date": "2026-01-08", "time": "12:52", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3219.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-306", "date": "2026-01-09", "time": "11:14", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4672.6, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-307", "date": "2026-01-10", "time": "01:59", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 13804.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-308", "date": "2026-01-11", "time": "10:42", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7286.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-309", "date": "2026-01-12", "time": "16:02", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8985.4, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-310", "date": "2026-01-13", "time": "11:00", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5036.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-311", "date": "2026-01-14", "time": "11:00", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2324.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-312", "date": "2026-01-15", "time": "12:07", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4887.7, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-313", "date": "2026-01-15", "time": "13:02", "type": "income", "category": "Jing Jai market", "tags": [], "amount": 3127.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-314", "date": "2026-01-16", "time": "12:51", "type": "income", "category": "Jing Jai market", "tags": [], "amount": 9138.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-315", "date": "2026-01-16", "time": "14:30", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3533.65, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-316", "date": "2026-01-17", "time": "12:08", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 10596.6, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-317", "date": "2026-01-17", "time": "13:42", "type": "income", "category": "Jing Jai market", "tags": [], "amount": 29586.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-318", "date": "2026-01-18", "time": "11:47", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4156.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-319", "date": "2026-01-18", "time": "14:03", "type": "income", "category": "Jing Jai market", "tags": [], "amount": 24522.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-320", "date": "2026-01-19", "time": "13:02", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4761.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-321", "date": "2026-01-20", "time": "09:36", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 10069.4, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-322", "date": "2026-01-21", "time": "12:59", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4018.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-323", "date": "2026-01-22", "time": "12:46", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4555.4, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-324", "date": "2026-01-23", "time": "10:17", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3333.45, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-325", "date": "2026-01-24", "time": "10:13", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5449.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-326", "date": "2026-01-25", "time": "11:07", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8315.6, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-327", "date": "2026-01-26", "time": "10:26", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3589.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-328", "date": "2026-01-27", "time": "10:18", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4463.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-329", "date": "2026-01-28", "time": "10:18", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 9305.05, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-330", "date": "2026-01-29", "time": "10:46", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2199.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-331", "date": "2026-01-30", "time": "10:07", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7932.75, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-332", "date": "2026-01-31", "time": "10:58", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6299.55, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-333", "date": "2026-02-01", "time": "13:53", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7267.95, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-334", "date": "2026-02-02", "time": "13:08", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6754.1, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-335", "date": "2026-02-03", "time": "14:01", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 9230.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-336", "date": "2026-02-04", "time": "11:01", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 13051.4, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-337", "date": "2026-02-05", "time": "10:42", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3012.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-338", "date": "2026-02-06", "time": "13:05", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6542.9, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-339", "date": "2026-02-07", "time": "10:40", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 11945.1, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-340", "date": "2026-02-08", "time": "13:46", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 9303.35, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-341", "date": "2026-02-09", "time": "10:52", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4574.9, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-342", "date": "2026-02-11", "time": "13:58", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4609.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-343", "date": "2026-02-12", "time": "12:01", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2130.75, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-344", "date": "2026-02-13", "time": "12:00", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5102.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-345", "date": "2026-02-14", "time": "11:28", "type": "income", "category": "Scenic Pran", "tags": [], "amount": 6740.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-346", "date": "2026-02-14", "time": "11:28", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4686.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-347", "date": "2026-02-15", "time": "02:42", "type": "income", "category": "Scenic Pran", "tags": [], "amount": 7880.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-348", "date": "2026-02-16", "time": "10:35", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2992.26, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-349", "date": "2026-02-16", "time": "10:36", "type": "income", "category": "Tower B / 3", "tags": [], "amount": 5719.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-350", "date": "2026-02-17", "time": "07:56", "type": "income", "category": "Tower B / 3", "tags": [], "amount": 9274.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-351", "date": "2026-02-17", "time": "10:18", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3130.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-352", "date": "2026-02-18", "time": "07:52", "type": "income", "category": "Tower B / 3", "tags": [], "amount": 7900.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-353", "date": "2026-02-18", "time": "10:41", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3064.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-354", "date": "2026-02-19", "time": "08:26", "type": "income", "category": "Tower B / 3", "tags": [], "amount": 8080.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-355", "date": "2026-02-19", "time": "10:09", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7312.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-356", "date": "2026-02-20", "time": "09:22", "type": "income", "category": "Tower B / 3", "tags": [], "amount": 10650.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-357", "date": "2026-02-20", "time": "10:05", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3368.3, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-358", "date": "2026-02-21", "time": "11:27", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4501.56, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-359", "date": "2026-02-22", "time": "11:26", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6114.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-360", "date": "2026-02-23", "time": "10:12", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2479.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-361", "date": "2026-02-24", "time": "10:11", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5876.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-362", "date": "2026-02-25", "time": "10:38", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4502.4, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-363", "date": "2026-02-26", "time": "13:01", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4707.59, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-364", "date": "2026-02-27", "time": "10:06", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4710.5, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-365", "date": "2026-02-28", "time": "10:39", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 11374.56, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-366", "date": "2026-03-01", "time": "10:11", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4845.18, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-367", "date": "2026-03-02", "time": "10:03", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7647.65, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-368", "date": "2026-03-03", "time": "11:58", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4159.6, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-369", "date": "2026-03-04", "time": "11:13", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5972.1, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-370", "date": "2026-03-04", "time": "11:24", "type": "income", "category": "Central Nakhonsawan", "tags": [], "amount": 3525.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-371", "date": "2026-03-05", "time": "12:13", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 14222.56, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-372", "date": "2026-03-05", "time": "12:59", "type": "income", "category": "Central Nakhonsawan", "tags": [], "amount": 4070.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-373", "date": "2026-03-06", "time": "13:03", "type": "income", "category": "Central Nakhonsawan", "tags": [], "amount": 2586.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-374", "date": "2026-03-06", "time": "13:04", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3323.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-375", "date": "2026-03-07", "time": "10:04", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5028.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-376", "date": "2026-03-07", "time": "11:22", "type": "income", "category": "Central Nakhonsawan", "tags": [], "amount": 6784.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-377", "date": "2026-03-08", "time": "13:02", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6215.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-378", "date": "2026-03-08", "time": "14:41", "type": "income", "category": "Central Nakhonsawan", "tags": [], "amount": 10442.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-379", "date": "2026-03-09", "time": "11:08", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5665.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-380", "date": "2026-03-09", "time": "11:08", "type": "income", "category": "Tower B / 4", "tags": [], "amount": 6052.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-381", "date": "2026-03-10", "time": "08:12", "type": "income", "category": "Tower B / 4", "tags": [], "amount": 8741.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-382", "date": "2026-03-10", "time": "10:22", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7656.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-383", "date": "2026-03-11", "time": "08:30", "type": "income", "category": "Tower B / 4", "tags": [], "amount": 9650.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-384", "date": "2026-03-11", "time": "10:42", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3702.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-385", "date": "2026-03-12", "time": "07:54", "type": "income", "category": "Tower B / 4", "tags": [], "amount": 8979.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-386", "date": "2026-03-12", "time": "15:16", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5004.1, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-387", "date": "2026-03-13", "time": "09:25", "type": "income", "category": "Tower B / 4", "tags": [], "amount": 11908.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-388", "date": "2026-03-13", "time": "10:43", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8126.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-389", "date": "2026-03-14", "time": "10:16", "type": "income", "category": "Vegetable Station 2", "tags": [], "amount": 9829.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-390", "date": "2026-03-14", "time": "10:18", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7853.4, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-391", "date": "2026-03-15", "time": "10:24", "type": "income", "category": "Vegetable Station 2", "tags": [], "amount": 7640.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-392", "date": "2026-03-15", "time": "10:25", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4434.9, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-393", "date": "2026-03-16", "time": "13:24", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2737.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-394", "date": "2026-03-17", "time": "09:11", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 10742.18, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-395", "date": "2026-03-18", "time": "15:21", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5787.7, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-396", "date": "2026-03-19", "time": "10:04", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5820.3, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-397", "date": "2026-03-19", "time": "14:16", "type": "income", "category": "Robinson Ratcha", "tags": [], "amount": 4666.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-398", "date": "2026-03-20", "time": "10:41", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7066.9, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-399", "date": "2026-03-20", "time": "13:44", "type": "income", "category": "Robinson Ratcha", "tags": [], "amount": 6701.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-400", "date": "2026-03-21", "time": "13:08", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 9407.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-401", "date": "2026-03-21", "time": "13:10", "type": "income", "category": "Robinson Ratcha", "tags": [], "amount": 8447.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-402", "date": "2026-03-22", "time": "12:00", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4588.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-403", "date": "2026-03-22", "time": "14:46", "type": "income", "category": "Robinson Ratcha", "tags": [], "amount": 14656.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-404", "date": "2026-03-23", "time": "10:03", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2071.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-405", "date": "2026-03-24", "time": "10:52", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2137.78, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-406", "date": "2026-03-25", "time": "10:15", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6141.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-407", "date": "2026-03-25", "time": "10:17", "type": "income", "category": "Tower A / 2", "tags": [], "amount": 3274.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-408", "date": "2026-03-26", "time": "16:49", "type": "income", "category": "Tower A / 2", "tags": [], "amount": 7602.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-409", "date": "2026-03-26", "time": "21:59", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 10095.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-410", "date": "2026-03-27", "time": "15:42", "type": "income", "category": "Tower A / 2", "tags": [], "amount": 9156.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-411", "date": "2026-03-27", "time": "20:02", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2088.86, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-412", "date": "2026-03-28", "time": "17:51", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5684.05, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-413", "date": "2026-03-29", "time": "17:31", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7475.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-414", "date": "2026-03-30", "time": "17:33", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3771.5, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-415", "date": "2026-03-31", "time": "19:56", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5970.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-416", "date": "2026-04-01", "time": "19:31", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3808.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-417", "date": "2026-04-02", "time": "19:30", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5220.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-418", "date": "2026-04-03", "time": "15:06", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5096.3, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-419", "date": "2026-04-04", "time": "16:51", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2597.3, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-420", "date": "2026-04-04", "time": "18:11", "type": "income", "category": "Trat", "tags": [], "amount": 8280.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-421", "date": "2026-04-05", "time": "19:05", "type": "income", "category": "Trat", "tags": [], "amount": 10520.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-422", "date": "2026-04-05", "time": "19:06", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5603.55, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-423", "date": "2026-04-06", "time": "15:35", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8563.4, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-424", "date": "2026-04-07", "time": "15:31", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3030.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-425", "date": "2026-04-08", "time": "21:24", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4908.45, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-426", "date": "2026-04-09", "time": "21:25", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 20357.4, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-427", "date": "2026-04-10", "time": "13:58", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 12575.9, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-428", "date": "2026-04-11", "time": "17:25", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6667.7, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-429", "date": "2026-04-12", "time": "17:25", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6538.98, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-430", "date": "2026-04-13", "time": "16:45", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 13159.21, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-431", "date": "2026-04-14", "time": "16:52", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 10755.98, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-432", "date": "2026-04-15", "time": "18:02", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3755.4, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-433", "date": "2026-04-16", "time": "15:05", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4243.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-434", "date": "2026-04-17", "time": "15:03", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8701.13, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-435", "date": "2026-04-18", "time": "17:55", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7487.68, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-436", "date": "2026-04-19", "time": "16:35", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6879.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-437", "date": "2026-04-20", "time": "15:45", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 10772.75, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-438", "date": "2026-04-21", "time": "15:13", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7738.72, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-439", "date": "2026-04-22", "time": "14:45", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4347.45, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-440", "date": "2026-04-23", "time": "15:14", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5935.15, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-441", "date": "2026-04-24", "time": "15:14", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4472.41, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-442", "date": "2026-04-25", "time": "17:49", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8043.16, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-443", "date": "2026-04-25", "time": "21:01", "type": "income", "category": "Central Korat 2", "tags": [], "amount": 27673.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-444", "date": "2026-04-26", "time": "20:14", "type": "income", "category": "Central Korat 2", "tags": [], "amount": 30246.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-445", "date": "2026-04-26", "time": "20:14", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8246.58, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-446", "date": "2026-04-27", "time": "18:11", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4879.54, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-447", "date": "2026-04-27", "time": "21:20", "type": "income", "category": "Central Korat 2", "tags": [], "amount": 16769.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-448", "date": "2026-04-28", "time": "14:55", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4030.98, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-449", "date": "2026-04-28", "time": "19:52", "type": "income", "category": "Central Korat 2", "tags": [], "amount": 14407.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-450", "date": "2026-04-29", "time": "20:24", "type": "income", "category": "Central Korat 2", "tags": [], "amount": 15739.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-451", "date": "2026-04-29", "time": "20:25", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7182.57, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-452", "date": "2026-04-30", "time": "17:05", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 12995.35, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-453", "date": "2026-04-30", "time": "20:18", "type": "income", "category": "Central Korat 2", "tags": [], "amount": 13780.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-454", "date": "2026-05-01", "time": "18:05", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5055.27, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-455", "date": "2026-05-01", "time": "20:25", "type": "income", "category": "Central Korat 2", "tags": [], "amount": 11277.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-456", "date": "2026-05-02", "time": "17:14", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3651.92, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-457", "date": "2026-05-02", "time": "20:04", "type": "income", "category": "Central Korat 2", "tags": [], "amount": 20929.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-458", "date": "2026-05-03", "time": "21:51", "type": "income", "category": "Central Korat 2", "tags": [], "amount": 20639.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-459", "date": "2026-05-03", "time": "21:52", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6466.28, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-460", "date": "2026-05-04", "time": "19:54", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 1050.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-461", "date": "2026-05-05", "time": "16:36", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3609.6, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-462", "date": "2026-05-06", "time": "19:41", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5126.31, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-463", "date": "2026-05-07", "time": "20:21", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3526.28, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-464", "date": "2026-05-08", "time": "16:32", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6000.38, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-465", "date": "2026-05-09", "time": "17:00", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4519.45, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-466", "date": "2026-05-10", "time": "16:43", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8557.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-467", "date": "2026-05-11", "time": "15:28", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3338.75, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-468", "date": "2026-05-12", "time": "15:23", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3978.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-469", "date": "2026-05-13", "time": "15:10", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4749.51, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-470", "date": "2026-05-14", "time": "15:17", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8080.76, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-471", "date": "2026-05-15", "time": "16:37", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5502.3, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-472", "date": "2026-05-16", "time": "18:28", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 12668.05, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-473", "date": "2026-05-17", "time": "17:16", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 17213.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-474", "date": "2026-05-18", "time": "18:01", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6020.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-475", "date": "2026-05-19", "time": "15:19", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8106.4, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-476", "date": "2026-05-20", "time": "14:03", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4754.6, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-477", "date": "2026-05-21", "time": "15:57", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4437.85, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-478", "date": "2026-05-22", "time": "19:27", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5454.05, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-479", "date": "2026-05-22", "time": "19:32", "type": "income", "category": "Robinson buriram 2", "tags": [], "amount": 8228.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-480", "date": "2026-05-23", "time": "20:30", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8893.96, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-481", "date": "2026-05-23", "time": "20:33", "type": "income", "category": "Robinson buriram 2", "tags": [], "amount": 38849.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-482", "date": "2026-05-24", "time": "17:46", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7772.45, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-483", "date": "2026-05-24", "time": "20:59", "type": "income", "category": "Robinson buriram 2", "tags": [], "amount": 29637.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-484", "date": "2026-05-25", "time": "15:51", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 11386.57, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-485", "date": "2026-05-26", "time": "08:15", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 2941.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-486", "date": "2026-05-27", "time": "17:28", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7189.02, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-487", "date": "2026-05-28", "time": "17:46", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3563.4, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-488", "date": "2026-05-28", "time": "20:38", "type": "income", "category": "Central Khon kean", "tags": [], "amount": 4734.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-489", "date": "2026-05-29", "time": "15:47", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3838.98, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-490", "date": "2026-05-29", "time": "19:43", "type": "income", "category": "Central Khon kean", "tags": [], "amount": 3918.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-491", "date": "2026-05-30", "time": "16:46", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5197.61, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-492", "date": "2026-05-30", "time": "20:36", "type": "income", "category": "Central Khon kean", "tags": [], "amount": 7829.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-493", "date": "2026-05-31", "time": "19:31", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6844.55, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-494", "date": "2026-05-31", "time": "20:47", "type": "income", "category": "Central Khon kean", "tags": [], "amount": 11077.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-495", "date": "2026-06-01", "time": "19:22", "type": "income", "category": "Central Khon kean", "tags": [], "amount": 8933.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-496", "date": "2026-06-02", "time": "20:32", "type": "income", "category": "Central Khon kean", "tags": [], "amount": 7175.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-497", "date": "2026-06-03", "time": "21:04", "type": "income", "category": "Central Khon kean", "tags": [], "amount": 13233.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-498", "date": "2026-06-05", "time": "15:25", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 10881.09, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-499", "date": "2026-06-06", "time": "18:34", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5182.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-500", "date": "2026-06-07", "time": "16:21", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7119.14, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-501", "date": "2026-06-08", "time": "16:08", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 1979.36, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-502", "date": "2026-06-09", "time": "16:08", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4873.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-503", "date": "2026-06-10", "time": "16:08", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 13863.52, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-504", "date": "2026-06-11", "time": "16:07", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3455.42, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-505", "date": "2026-06-12", "time": "15:42", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 9505.04, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-506", "date": "2026-06-13", "time": "17:19", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5942.1, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-507", "date": "2026-06-14", "time": "17:19", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6137.6, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-508", "date": "2026-06-15", "time": "15:34", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5178.6, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-509", "date": "2026-06-16", "time": "16:55", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7284.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-510", "date": "2026-06-17", "time": "15:29", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4304.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-511", "date": "2026-06-18", "time": "18:23", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5342.2, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-512", "date": "2026-06-19", "time": "15:15", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 7488.8, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-513", "date": "2026-06-20", "time": "16:43", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6776.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-514", "date": "2026-06-21", "time": "16:27", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8054.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-515", "date": "2026-06-22", "time": "15:35", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 8992.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-516", "date": "2026-06-23", "time": "15:24", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5434.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-517", "date": "2026-06-24", "time": "15:00", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4965.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-518", "date": "2026-06-25", "time": "15:13", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4206.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-519", "date": "2026-06-26", "time": "16:09", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3859.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-520", "date": "2026-06-27", "time": "16:40", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 13077.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-521", "date": "2026-06-28", "time": "16:24", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5417.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-522", "date": "2026-06-29", "time": "15:54", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6857.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-523", "date": "2026-06-30", "time": "15:13", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 4036.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-524", "date": "2026-07-01", "time": "16:08", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 3300.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-525", "date": "2026-07-02", "time": "15:20", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 5681.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-526", "date": "2026-07-03", "time": "17:51", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 15447.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-527", "date": "2026-07-04", "time": "16:22", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 18177.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-528", "date": "2026-07-05", "time": "20:21", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 6073.0, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}, {"id": "seed-529", "date": "2026-07-06", "time": "11:19", "type": "income", "category": "Home Base Catcow", "tags": [], "amount": 14720.5, "note": "", "account": "Cash", "paymentChannel": "", "recipientBank": "", "recipient": ""}];
-
 let state = {
   transactions: [],
   categories: { income: [], expense: [] },
   accounts: [],
   budgets: { overall: 0, byCategory: {} },
-  noteMemory: {}, // note-keyword -> category (auto-learning)
+  noteMemory: {},
+  pin: '',
+  users: ['User'],
+  currentUser: '',
   currentMonth: new Date(),
   selectedDay: null,
   view: 'home',
@@ -505,41 +581,79 @@ let state = {
   analyticsRange: 'month'
 };
 
-/* ---------------- persistence ---------------- */
-function loadState(){
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if(raw){
-    try{
-      const parsed = JSON.parse(raw);
-      state.transactions = parsed.transactions || [];
-      state.categories = parsed.categories || { income: [], expense: [] };
-      state.accounts = parsed.accounts || DEFAULT_ACCOUNTS.slice();
-      state.budgets = parsed.budgets || { overall: 0, byCategory: {} };
-      state.noteMemory = parsed.noteMemory || {};
-      return;
-    }catch(e){ console.warn('load fail, reseeding', e); }
-  }
-  seedFresh();
+let realtimeChannel = null;
+
+/* ---------------- Supabase data layer ---------------- */
+function rowToTxn(r){
+  return {
+    id: r.id, date: r.date, time: r.time || '', type: r.type,
+    category: r.category || '', tags: r.tags || [], amount: Number(r.amount),
+    note: r.note || '', account: r.account || '', recipient: r.recipient || '',
+    recordedBy: r.recorded_by || ''
+  };
+}
+function txnToRow(t){
+  return {
+    id: t.id, date: t.date, time: t.time || '', type: t.type,
+    category: t.category || '', tags: t.tags || [], amount: t.amount,
+    note: t.note || '', account: t.account || '', recipient: t.recipient || '',
+    recorded_by: t.recordedBy || ''
+  };
 }
 
-function seedFresh(){
-  state.transactions = SEED_DATA.slice();
-  const incomeCats = Array.from(new Set(SEED_DATA.map(t => t.category))).sort();
-  state.categories = { income: incomeCats.length? incomeCats : ["General"], expense: DEFAULT_EXPENSE_CATS.slice() };
-  state.accounts = DEFAULT_ACCOUNTS.slice();
-  state.budgets = { overall: 0, byCategory: {} };
-  state.noteMemory = {};
-  saveState();
+async function loadSettings(){
+  const { data, error } = await sb.from('app_settings').select('data').eq('id', 1).single();
+  if(error) throw error;
+  const s = data.data || {};
+  state.categories = s.categories || { income: ["General"], expense: DEFAULT_EXPENSE_CATS.slice() };
+  state.accounts = s.accounts || DEFAULT_ACCOUNTS.slice();
+  state.budgets = s.budgets || { overall: 0, byCategory: {} };
+  state.noteMemory = s.noteMemory || {};
+  state.pin = s.pin || '';
+  state.users = (s.users && s.users.length) ? s.users : ['User'];
 }
 
-function saveState(){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({
-    transactions: state.transactions,
+async function saveSettings(){
+  const payload = {
     categories: state.categories,
     accounts: state.accounts,
     budgets: state.budgets,
-    noteMemory: state.noteMemory
-  }));
+    noteMemory: state.noteMemory,
+    pin: state.pin,
+    users: state.users
+  };
+  const { error } = await sb.from('app_settings').update({ data: payload }).eq('id', 1);
+  if(error) console.error('saveSettings error', error);
+}
+
+async function loadTransactions(){
+  const { data, error } = await sb.from('transactions').select('*').order('date', { ascending: true }).order('time', { ascending: true });
+  if(error) throw error;
+  state.transactions = (data || []).map(rowToTxn);
+}
+
+function subscribeRealtime(){
+  if(realtimeChannel) return;
+  realtimeChannel = sb.channel('transactions-sync')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
+      handleRealtimeChange(payload);
+    })
+    .subscribe();
+}
+
+function handleRealtimeChange(payload){
+  if(payload.eventType === 'INSERT'){
+    if(!state.transactions.find(t => t.id === payload.new.id)){
+      state.transactions.push(rowToTxn(payload.new));
+    }
+  } else if(payload.eventType === 'UPDATE'){
+    const idx = state.transactions.findIndex(t => t.id === payload.new.id);
+    if(idx >= 0) state.transactions[idx] = rowToTxn(payload.new);
+    else state.transactions.push(rowToTxn(payload.new));
+  } else if(payload.eventType === 'DELETE'){
+    state.transactions = state.transactions.filter(t => t.id !== payload.old.id);
+  }
+  renderAll();
 }
 
 /* ---------------- helpers ---------------- */
@@ -563,7 +677,7 @@ function monthRange(date){
   return {start, end};
 }
 function weekRange(date){
-  const day = date.getDay(); // 0=sun
+  const day = date.getDay();
   const start = new Date(date); start.setDate(date.getDate()-day);
   const end = new Date(start); end.setDate(start.getDate()+6);
   return {start, end};
@@ -572,7 +686,6 @@ function inRange(txnDateIso, start, end){
   const d = parseIso(txnDateIso);
   return d >= start && d <= end;
 }
-
 function txnsForMonth(date){
   const {start,end} = monthRange(date);
   return state.transactions.filter(t=>inRange(t.date,start,end));
@@ -597,7 +710,6 @@ function renderHome(){
   document.getElementById('sumExpense').textContent = fmtMoney(expense);
   document.getElementById('sumNet').textContent = fmtMoneySigned(net);
 
-  // previous month delta
   const prevMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth()-1, 1);
   const prevTxns = txnsForMonth(prevMonth);
   const prevIncome = sumByType(prevTxns,'income');
@@ -606,7 +718,6 @@ function renderHome(){
   setDelta('deltaExpense', expense, prevExpense);
   setDelta('deltaNet', net, prevIncome-prevExpense);
 
-  // week strip (current real week, only meaningful if viewing current month but compute regardless)
   const {start,end} = weekRange(new Date());
   const weekTxns = state.transactions.filter(t=>inRange(t.date,start,end));
   const wIncome = sumByType(weekTxns,'income');
@@ -618,7 +729,6 @@ function renderHome(){
   renderBudgetOverview(monthTxns, expense);
   renderAlertBanner(expense);
 
-  // recent list: latest 8 across all data
   const recent = state.transactions.slice().sort((a,b)=> (b.date+b.time).localeCompare(a.date+a.time)).slice(0,8);
   renderTxnList(document.getElementById('recentList'), recent);
 }
@@ -696,7 +806,7 @@ function renderTxnList(container, list){
       <div class="txn-mid">
         <div class="txn-cat">${escapeHtml(t.category||'Uncategorized')}</div>
         <div class="txn-note">${escapeHtml(t.note||'')}</div>
-        ${t.tags && t.tags.length? `<div class="txn-tags">#${t.tags.map(escapeHtml).join(' #')}</div>`:''}
+        <div class="txn-tags">${t.tags && t.tags.length? '#'+t.tags.map(escapeHtml).join(' #')+' &middot; ':''}${t.recordedBy? '<span class="by-tag">'+escapeHtml(t.recordedBy)+'</span>' : ''}</div>
         <div class="txn-date-small">${formatDate(t.date)} ${t.time||''}</div>
       </div>
       <div class="txn-amount ${t.type}">${t.type==='income'?'+':'-'}${fmtMoney(t.amount)}</div>
@@ -731,7 +841,6 @@ function renderCalendar(){
     dayMap[t.date].count++;
   });
 
-  // tier thresholds based on this month's daily income values (relative heat-map)
   const incomeValues = Object.values(dayMap).map(v=>v.income).filter(v=>v>0).sort((a,b)=>a-b);
   let lowCut = null, highCut = null;
   if(incomeValues.length>0){
@@ -852,7 +961,6 @@ const GRAYS = ['#000000','#333333','#555555','#777777','#999999','#aaaaaa','#bbb
 function renderAnalytics(){
   const list = getAnalyticsRangeTxns();
 
-  // top locations (income by category)
   const incomeByCat = {};
   list.filter(t=>t.type==='income').forEach(t=>{ incomeByCat[t.category] = (incomeByCat[t.category]||0) + Number(t.amount); });
   const topLoc = Object.entries(incomeByCat).sort((a,b)=>b[1]-a[1]).slice(0,10);
@@ -865,7 +973,6 @@ function renderAnalytics(){
     options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{font:{size:9}}}, y:{ticks:{font:{size:9}}}} }
   });
 
-  // expense pie
   const expByCat = {};
   list.filter(t=>t.type==='expense').forEach(t=>{ expByCat[t.category] = (expByCat[t.category]||0) + Number(t.amount); });
   const expEntries = Object.entries(expByCat).sort((a,b)=>b[1]-a[1]);
@@ -877,7 +984,6 @@ function renderAnalytics(){
     options:{ plugins:{legend:{position:'bottom', labels:{font:{size:9}, color:'#111111'}}} }
   });
 
-  // monthly trend (last 12 months window ending this month, regardless of range tab)
   const months = [];
   const now = new Date();
   for(let i=11;i>=0;i--){ months.push(new Date(now.getFullYear(), now.getMonth()-i, 1)); }
@@ -897,7 +1003,6 @@ function renderAnalytics(){
     options:{ plugins:{legend:{labels:{font:{size:10}, color:'#111111'}}}, scales:{x:{ticks:{font:{size:8}}}, y:{ticks:{font:{size:8}}}} }
   });
 
-  // location table (rank, total, count, avg)
   renderLocationTable(topLoc, list);
 }
 
@@ -927,7 +1032,6 @@ function suggestCategoryFromNote(note){
   const lower = note.trim().toLowerCase();
   const firstWord = lower.split(/\s+/)[0];
   if(state.noteMemory[firstWord]) return state.noteMemory[firstWord];
-  // fallback: substring match against memory keys
   for(const key in state.noteMemory){
     if(key.length>2 && lower.includes(key)) return state.noteMemory[key];
   }
@@ -945,6 +1049,22 @@ function populateFormSelects(){
   accSel.innerHTML = state.accounts.map(a=>`<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('');
 
   document.getElementById('fRecipientWrap').style.display = state.txnTypeInForm==='expense' ? 'block' : 'none';
+
+  renderRecordedByButtons();
+}
+
+function renderRecordedByButtons(){
+  const wrap = document.getElementById('fRecordedBy');
+  if(!wrap) return;
+  wrap.innerHTML = state.users.map(u =>
+    `<button type="button" class="user-chip-btn ${u===state._formRecordedBy?'active':''}" data-user="${escapeHtml(u)}">${escapeHtml(u)}</button>`
+  ).join('');
+  wrap.querySelectorAll('.user-chip-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state._formRecordedBy = btn.getAttribute('data-user');
+      renderRecordedByButtons();
+    });
+  });
 }
 
 function setFormType(type){
@@ -956,6 +1076,7 @@ function setFormType(type){
 
 function openAddModal(prefillDate){
   state.editingId = null;
+  state._formRecordedBy = state.currentUser || state.users[0] || '';
   document.getElementById('modalTitle').textContent = 'Add Transaction';
   document.getElementById('btnDelete').classList.add('hidden');
   setFormType('income');
@@ -975,6 +1096,7 @@ function openEditModal(id){
   const t = state.transactions.find(x=>x.id===id);
   if(!t) return;
   state.editingId = id;
+  state._formRecordedBy = t.recordedBy || state.currentUser || state.users[0] || '';
   document.getElementById('modalTitle').textContent = 'Edit Transaction';
   document.getElementById('btnDelete').classList.remove('hidden');
   setFormType(t.type);
@@ -1001,6 +1123,7 @@ function handleCategoryChange(){
       const trimmed = name.trim();
       if(state.txnTypeInForm==='income') state.categories.income.push(trimmed);
       else state.categories.expense.push(trimmed);
+      saveSettings();
       populateFormSelects();
       sel.value = trimmed;
     } else {
@@ -1009,7 +1132,7 @@ function handleCategoryChange(){
   }
 }
 
-function saveTxn(){
+async function saveTxn(){
   const amount = parseFloat(document.getElementById('fAmount').value);
   if(!amount || amount<=0){ showToast('Please enter a valid amount'); return; }
   const date = document.getElementById('fDate').value || todayIso();
@@ -1019,35 +1142,49 @@ function saveTxn(){
   const tags = document.getElementById('fTags').value.split(',').map(s=>s.trim()).filter(Boolean);
   const account = document.getElementById('fAccount').value;
   const recipient = document.getElementById('fRecipient').value.trim();
+  const recordedBy = state._formRecordedBy || '';
 
   learnNoteCategory(note, category);
+  saveSettings();
 
-  if(state.editingId){
-    const t = state.transactions.find(x=>x.id===state.editingId);
-    Object.assign(t, {amount, date, time, category, note, tags, account, recipient, type: state.txnTypeInForm});
-  } else {
-    state.transactions.push({
-      id: uid(), type: state.txnTypeInForm, amount, date, time, category, tags, note,
-      account, paymentChannel:'', recipientBank:'', recipient
-    });
+  const btn = document.getElementById('btnSaveTxn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  try{
+    if(state.editingId){
+      const t = state.transactions.find(x=>x.id===state.editingId);
+      Object.assign(t, {amount, date, time, category, note, tags, account, recipient, recordedBy, type: state.txnTypeInForm});
+      const { error } = await sb.from('transactions').update(txnToRow(t)).eq('id', t.id);
+      if(error) throw error;
+    } else {
+      const t = { id: uid(), type: state.txnTypeInForm, amount, date, time, category, tags, note, account, recipient, recordedBy };
+      state.transactions.push(t);
+      const { error } = await sb.from('transactions').insert(txnToRow(t));
+      if(error) throw error;
+    }
+    closeModalFn();
+    renderAll();
+    showToast('Saved');
+  }catch(err){
+    console.error(err);
+    showToast('Save failed — check connection');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Save';
   }
-  saveState();
-  closeModalFn();
-  renderAll();
-  showToast('Saved');
 }
 
-function deleteTxn(){
+async function deleteTxn(){
   if(!state.editingId) return;
   if(!confirm('Delete this transaction?')) return;
-  state.transactions = state.transactions.filter(t=>t.id!==state.editingId);
-  saveState();
+  const id = state.editingId;
+  state.transactions = state.transactions.filter(t=>t.id!==id);
   closeModalFn();
   renderAll();
-  showToast('Transaction deleted');
+  const { error } = await sb.from('transactions').delete().eq('id', id);
+  if(error){ console.error(error); showToast('Delete may have failed — check connection'); }
+  else showToast('Transaction deleted');
 }
 
-/* note input -> auto suggest category */
 function onNoteInput(){
   const note = document.getElementById('fNote').value;
   const suggestion = suggestCategoryFromNote(note);
@@ -1103,7 +1240,6 @@ function parseVoiceTranscript(text){
   const statusEl = document.getElementById('voiceStatus');
   statusEl.textContent = `Heard: "${text}"`;
 
-  // detect type
   const expenseWords = ['spent','paid','expense','bought','cost','purchase'];
   const incomeWords = ['income','received','sold','earned','revenue'];
   const lowerText = text.toLowerCase();
@@ -1112,19 +1248,16 @@ function parseVoiceTranscript(text){
   else if(incomeWords.some(w=>lowerText.includes(w))) type = 'income';
   setFormType(type);
 
-  // extract amount: sequence of digits (with optional comma/decimal)
   const match = text.match(/([\d,]+(?:\.\d+)?)/);
   if(match){
     const amt = parseFloat(match[1].replace(/,/g,''));
     if(!isNaN(amt)) document.getElementById('fAmount').value = amt;
   }
 
-  // try match category by substring
   const cats = type==='income' ? state.categories.income : state.categories.expense;
   const foundCat = cats.find(c => lowerText.includes(c.toLowerCase()));
   if(foundCat) document.getElementById('fCategory').value = foundCat;
 
-  // remaining text as note (strip amount + trigger words)
   let noteText = text.replace(match ? match[0] : '', '').replace(/baht/gi,'').trim();
   document.getElementById('fNote').value = noteText || text;
   onNoteInput();
@@ -1145,6 +1278,10 @@ function renderSettings(){
   renderChipList('catIncomeList', state.categories.income, 'income');
   renderChipList('catExpenseList', state.categories.expense, 'expense');
   renderChipList('accountList', state.accounts, 'account');
+  renderChipList('userList', state.users, 'user');
+
+  document.getElementById('activeUserLabel').textContent = state.currentUser || '(none)';
+  document.getElementById('pinInputSettings').value = '';
 }
 
 function renderChipList(containerId, items, kind){
@@ -1156,7 +1293,8 @@ function removeChip(kind, item){
   if(kind==='income') state.categories.income = state.categories.income.filter(x=>x!==item);
   else if(kind==='expense') state.categories.expense = state.categories.expense.filter(x=>x!==item);
   else if(kind==='account') state.accounts = state.accounts.filter(x=>x!==item);
-  saveState();
+  else if(kind==='user') state.users = state.users.filter(x=>x!==item);
+  saveSettings();
   renderSettings();
 }
 
@@ -1168,24 +1306,24 @@ function saveBudgets(){
     if(val>0) state.budgets.byCategory[cat]=val;
     else delete state.budgets.byCategory[cat];
   });
-  saveState();
+  saveSettings();
   renderAll();
   showToast('Budget saved');
 }
 
 function exportCsv(){
-  const header = ['Date','Time','Type','Category','Tags','Amount','Note','Account','Recipient'];
+  const header = ['Date','Time','Type','Category','Tags','Amount','Note','Account','Recipient','RecordedBy'];
   const rows = state.transactions.slice().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)).map(t=>{
     const d = parseIso(t.date);
     const ddmmyyyy = pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+'/'+d.getFullYear();
-    return [ddmmyyyy, t.time, t.type==='income'?'Income':'Expense', t.category, (t.tags||[]).join('|')||'-', t.amount, t.note||'-', t.account||'-', t.recipient||'-'];
+    return [ddmmyyyy, t.time, t.type==='income'?'Income':'Expense', t.category, (t.tags||[]).join('|')||'-', t.amount, t.note||'-', t.account||'-', t.recipient||'-', t.recordedBy||'-'];
   });
   const csv = [header, ...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   downloadBlob('﻿'+csv, 'kellyjod_export.csv', 'text/csv;charset=utf-8');
 }
 
 function exportJson(){
-  downloadBlob(JSON.stringify({transactions:state.transactions, categories:state.categories, accounts:state.accounts, budgets:state.budgets, noteMemory:state.noteMemory}, null, 2), 'kellyjod_backup.json', 'application/json');
+  downloadBlob(JSON.stringify({transactions:state.transactions, categories:state.categories, accounts:state.accounts, budgets:state.budgets, noteMemory:state.noteMemory, users:state.users}, null, 2), 'kellyjod_backup.json', 'application/json');
 }
 
 function downloadBlob(content, filename, mime){
@@ -1199,32 +1337,60 @@ function downloadBlob(content, filename, mime){
 
 function importJsonFile(file){
   const reader = new FileReader();
-  reader.onload = (e)=>{
+  reader.onload = async (e)=>{
     try{
       const data = JSON.parse(e.target.result);
-      if(data.transactions){
-        state.transactions = data.transactions;
-        state.categories = data.categories || state.categories;
-        state.accounts = data.accounts || state.accounts;
-        state.budgets = data.budgets || state.budgets;
-        state.noteMemory = data.noteMemory || state.noteMemory;
-        saveState();
-        renderAll();
-        showToast('Import successful');
-      } else {
-        showToast('Invalid file');
+      if(!data.transactions){ showToast('Invalid file'); return; }
+      showToast('Importing… this may take a moment');
+      state.categories = data.categories || state.categories;
+      state.accounts = data.accounts || state.accounts;
+      state.budgets = data.budgets || state.budgets;
+      state.noteMemory = data.noteMemory || state.noteMemory;
+      state.users = data.users || state.users;
+      await saveSettings();
+
+      const rows = data.transactions.map(txnToRow);
+      const chunkSize = 100;
+      for(let i=0;i<rows.length;i+=chunkSize){
+        const chunk = rows.slice(i, i+chunkSize);
+        const { error } = await sb.from('transactions').upsert(chunk);
+        if(error) throw error;
       }
-    }catch(err){ showToast('Could not read file'); }
+      await loadTransactions();
+      renderAll();
+      showToast('Import successful');
+    }catch(err){ console.error(err); showToast('Import failed'); }
   };
   reader.readAsText(file);
 }
 
-function resetAll(){
-  if(!confirm('Reset all data and start fresh from sample data? This cannot be undone.')) return;
-  localStorage.removeItem(STORAGE_KEY);
-  seedFresh();
+async function resetAll(){
+  if(!confirm('This deletes ALL transactions for everyone and cannot be undone. Are you absolutely sure?')) return;
+  if(!confirm('Really sure? This affects the shared database used by both Mix and Anne.')) return;
+  const { error } = await sb.from('transactions').delete().neq('id', '__none__');
+  if(error){ showToast('Reset failed'); console.error(error); return; }
+  state.transactions = [];
   renderAll();
-  showToast('Data reset complete');
+  showToast('All transactions cleared');
+}
+
+function lockApp(){
+  localStorage.removeItem(LOCAL_UNLOCK_KEY);
+  location.reload();
+}
+
+function switchUser(){
+  localStorage.removeItem(LOCAL_USER_KEY);
+  location.reload();
+}
+
+async function changePin(){
+  const val = document.getElementById('pinInputSettings').value.trim();
+  if(!val || val.length<3){ showToast('PIN should be at least 3 digits'); return; }
+  state.pin = val;
+  await saveSettings();
+  showToast('PIN updated');
+  document.getElementById('pinInputSettings').value = '';
 }
 
 /* ================= TOAST ================= */
@@ -1258,7 +1424,7 @@ function renderAll(){
   if(state.view==='settings') renderSettings();
 }
 
-/* ================= INIT / EVENTS ================= */
+/* ================= EVENTS ================= */
 function bindEvents(){
   document.getElementById('prevMonth').addEventListener('click', ()=>{
     state.currentMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth()-1, 1);
@@ -1278,11 +1444,9 @@ function bindEvents(){
   document.getElementById('fabAdd').addEventListener('click', ()=> openAddModal());
   document.getElementById('closeModal').addEventListener('click', closeModalFn);
   document.getElementById('btnCancel').addEventListener('click', closeModalFn);
-  // click on the dark backdrop (outside the sheet) also closes the modal
   document.getElementById('modalAdd').addEventListener('click', (e)=>{
     if(e.target.id === 'modalAdd') closeModalFn();
   });
-  // Escape key closes the modal
   document.addEventListener('keydown', (e)=>{
     if(e.key === 'Escape' && !document.getElementById('modalAdd').classList.contains('hidden')){
       closeModalFn();
@@ -1320,15 +1484,16 @@ function bindEvents(){
   document.querySelectorAll('[data-add]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const kind = btn.getAttribute('data-add');
-      let inputId = kind==='income'?'newCatIncome': kind==='expense'?'newCatExpense':'newAccount';
+      let inputId = kind==='income'?'newCatIncome': kind==='expense'?'newCatExpense': kind==='user'?'newUser':'newAccount';
       const inp = document.getElementById(inputId);
       const val = inp.value.trim();
       if(!val) return;
       if(kind==='income') state.categories.income.push(val);
       else if(kind==='expense') state.categories.expense.push(val);
+      else if(kind==='user') state.users.push(val);
       else state.accounts.push(val);
       inp.value='';
-      saveState();
+      saveSettings();
       renderSettings();
     });
   });
@@ -1345,6 +1510,9 @@ function bindEvents(){
     if(e.target.files[0]) importJsonFile(e.target.files[0]);
   });
   document.getElementById('btnReset').addEventListener('click', resetAll);
+  document.getElementById('btnLock').addEventListener('click', lockApp);
+  document.getElementById('btnSwitchUser').addEventListener('click', switchUser);
+  document.getElementById('btnChangePin').addEventListener('click', changePin);
 
   document.getElementById('btn-search').addEventListener('click', ()=>{
     switchView('list');
@@ -1352,11 +1520,88 @@ function bindEvents(){
   });
 }
 
-function init(){
-  loadState();
+/* ================= LOCK SCREEN / USER SELECT ================= */
+function showScreen(id){
+  ['loadingScreen','lockScreen','userScreen'].forEach(s=>{
+    document.getElementById(s).classList.toggle('hidden', s!==id);
+  });
+  document.getElementById(id).classList.remove('hidden');
+}
+
+function initLockFlow(){
+  const pinInput = document.getElementById('pinInput');
+  const btnUnlock = document.getElementById('btnUnlock');
+  const pinError = document.getElementById('pinError');
+
+  function tryUnlock(){
+    if(pinInput.value === state.pin){
+      localStorage.setItem(LOCAL_UNLOCK_KEY, '1');
+      pinError.classList.add('hidden');
+      proceedAfterUnlock();
+    } else {
+      pinError.classList.remove('hidden');
+      pinInput.value='';
+      pinInput.focus();
+    }
+  }
+  btnUnlock.addEventListener('click', tryUnlock);
+  pinInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') tryUnlock(); });
+
+  if(localStorage.getItem(LOCAL_UNLOCK_KEY) === '1'){
+    proceedAfterUnlock();
+  } else {
+    showScreen('lockScreen');
+    pinInput.focus();
+  }
+}
+
+function proceedAfterUnlock(){
+  const savedUser = localStorage.getItem(LOCAL_USER_KEY);
+  if(savedUser && state.users.includes(savedUser)){
+    state.currentUser = savedUser;
+    finishBoot();
+  } else {
+    showScreen('userScreen');
+    const wrap = document.getElementById('userButtons');
+    wrap.innerHTML = state.users.map(u => `<button class="user-select-btn" data-user="${escapeHtml(u)}">${escapeHtml(u)}</button>`).join('');
+    wrap.querySelectorAll('.user-select-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const u = btn.getAttribute('data-user');
+        localStorage.setItem(LOCAL_USER_KEY, u);
+        state.currentUser = u;
+        finishBoot();
+      });
+    });
+  }
+}
+
+async function finishBoot(){
+  showScreen('loadingScreen');
+  try{
+    await loadTransactions();
+  }catch(err){
+    console.error(err);
+    showToast('Could not load data — check your connection');
+  }
+  document.getElementById('loadingScreen').classList.add('hidden');
+  document.getElementById('lockScreen').classList.add('hidden');
+  document.getElementById('userScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  subscribeRealtime();
+  renderAll();
+}
+
+async function init(){
   bindEvents();
   initVoice();
-  renderAll();
+  try{
+    await loadSettings();
+  }catch(err){
+    console.error(err);
+    document.getElementById('loadingScreen').innerHTML = '<div class="lock-box"><div class="lock-title">Connection error</div><div class="lock-sub">Could not reach the database. Check your internet connection and reload.</div></div>';
+    return;
+  }
+  initLockFlow();
 }
 
 document.addEventListener('DOMContentLoaded', init);
