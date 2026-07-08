@@ -187,13 +187,9 @@ main{padding:14px 16px 8px;}
 .form-row label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:5px;}
 .form-row input, .form-row select{width:100%;padding:10px 11px;border-radius:11px;border:1px solid var(--border);font-family:inherit;font-size:14px;background:var(--surface);color:var(--text);}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.mic-row{display:flex;gap:8px;}
-.mic-row input{flex:1;}
-.mic-btn{width:52px;border-radius:11px;border:1px solid var(--border);background:var(--surface-2);font-size:10px;cursor:pointer;font-weight:700;letter-spacing:0.5px;}
-.mic-btn.listening{background:var(--ink);color:#fff;border-color:var(--ink);animation:pulse 1s infinite;}
-@keyframes pulse{0%{opacity:1;}50%{opacity:0.55;}100%{opacity:1;}}
-.voice-status{font-size:11px;color:var(--ink);margin-top:6px;background:var(--surface-2);padding:6px 8px;border-radius:8px;}
-.voice-status.hidden{display:none;}
+.label-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;}
+.label-row label{margin-bottom:0;}
+.link-toggle{font-size:11px;color:var(--muted);text-decoration:underline;cursor:pointer;white-space:nowrap;}
 .auto-tag{color:var(--muted);font-weight:500;font-size:10.5px;}
 .auto-tag.hidden{display:none;}
 .modal-actions{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
@@ -454,7 +450,7 @@ main{padding:14px 16px 8px;}
 
       <div class="settings-block about-block">
         <div class="settings-head">About This App</div>
-        <p>Kelly Jod was built for MABC Roastco to track full income and expenses, with a calendar, budgets, tags, analytics, and voice input. Data syncs live across devices via a shared database — everyone using the app sees the same up-to-date numbers. The PIN is a convenience lock, not strong security; don't use this for anything beyond small-team bookkeeping.</p>
+        <p>Kelly Jod was built for MABC Roastco to track full income and expenses, with a calendar, budgets, tags, and analytics. Data syncs live across devices via a shared database — everyone using the app sees the same up-to-date numbers. The PIN is a convenience lock, not strong security; don't use this for anything beyond small-team bookkeeping.</p>
       </div>
     </section>
 
@@ -487,32 +483,25 @@ main{padding:14px 16px 8px;}
 
     <div class="form-row">
       <label>Amount (THB)</label>
-      <input id="fAmount" type="number" inputmode="decimal" placeholder="0.00">
-    </div>
-
-    <div class="form-row two-col">
-      <div>
-        <label>Date</label>
-        <input id="fDate" type="date">
-      </div>
-      <div>
-        <label>Time</label>
-        <input id="fTime" type="time">
-      </div>
+      <input id="fAmount" type="text" inputmode="decimal" placeholder="0.00 or 50+30+20">
     </div>
 
     <div class="form-row">
-      <label id="fCategoryLabel">Category / Location</label>
+      <label>Date</label>
+      <input id="fDate" type="date">
+    </div>
+
+    <div class="form-row">
+      <div class="label-row">
+        <label id="fCategoryLabel">Category / Location</label>
+        <span id="toggleAllCategories" class="link-toggle">Show all</span>
+      </div>
       <select id="fCategory"></select>
     </div>
 
     <div class="form-row">
       <label>Note <span id="autoTag" class="auto-tag hidden">✨ Auto-suggested category</span></label>
-      <div class="mic-row">
-        <input id="fNote" type="text" placeholder="Details, e.g. Dark roast coffee 2kg">
-        <button id="btnMic" class="mic-btn" title="Voice input">●REC</button>
-      </div>
-      <div id="voiceStatus" class="voice-status hidden"></div>
+      <input id="fNote" type="text" placeholder="Details, e.g. Dark roast coffee 2kg">
     </div>
 
     <div class="form-row">
@@ -520,15 +509,9 @@ main{padding:14px 16px 8px;}
       <input id="fTags" type="text" placeholder="e.g. running event, bestseller">
     </div>
 
-    <div class="form-row two-col">
-      <div>
-        <label>Account / Payment Method</label>
-        <select id="fAccount"></select>
-      </div>
-      <div id="fRecipientWrap">
-        <label>Recipient / Bank (optional)</label>
-        <input id="fRecipient" type="text" placeholder="e.g. Kasikorn Bank - Retail Store">
-      </div>
+    <div class="form-row" id="fRecipientWrap">
+      <label>Recipient / Bank (optional)</label>
+      <input id="fRecipient" type="text" placeholder="e.g. Kasikorn Bank - Retail Store">
     </div>
 
     <div class="form-row">
@@ -670,6 +653,21 @@ function isoDate(d){ return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.
 function parseIso(s){ const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
 function todayIso(){ return isoDate(new Date()); }
 function uid(){ return 'txn-'+Date.now()+'-'+Math.floor(Math.random()*10000); }
+function nowTimeStr(){ const n=new Date(); return pad2(n.getHours())+':'+pad2(n.getMinutes()); }
+function evalAmountExpr(str){
+  if(str===null || str===undefined) return NaN;
+  const raw = String(str).trim();
+  if(raw==='') return NaN;
+  const parts = raw.split('+').map(s=>s.trim()).filter(s=>s!=='');
+  if(parts.length===0) return NaN;
+  let sum = 0;
+  for(const p of parts){
+    const n = parseFloat(p.replace(/,/g,''));
+    if(isNaN(n)) return NaN;
+    sum += n;
+  }
+  return sum;
+}
 
 function monthRange(date){
   const start = new Date(date.getFullYear(), date.getMonth(), 1);
@@ -729,8 +727,11 @@ function renderHome(){
   renderBudgetOverview(monthTxns, expense);
   renderAlertBanner(expense);
 
-  const recent = state.transactions.slice().sort((a,b)=> (b.date+b.time).localeCompare(a.date+a.time)).slice(0,8);
-  renderTxnList(document.getElementById('recentList'), recent);
+  const todayStr = todayIso();
+  const yestStr = isoDate(new Date(Date.now()-86400000));
+  const recent = state.transactions.filter(t=> t.date===todayStr || t.date===yestStr)
+    .sort((a,b)=> (b.date+b.time+b.id).localeCompare(a.date+a.time+a.id));
+  renderTxnList(document.getElementById('recentList'), recent, 'No transactions today or yesterday');
 }
 
 function setDelta(elId, cur, prev){
@@ -792,10 +793,10 @@ function budgetRowHtml(label, spend, budget){
 /* ================= TRANSACTION LIST RENDER ================= */
 function categoryIcon(type){ return type==='income' ? '+' : '−'; }
 
-function renderTxnList(container, list){
+function renderTxnList(container, list, emptyMessage){
   container.innerHTML='';
   if(list.length===0){
-    container.innerHTML = '<div class="empty-hint">No transactions yet</div>';
+    container.innerHTML = '<div class="empty-hint">'+escapeHtml(emptyMessage||'No transactions yet')+'</div>';
     return;
   }
   list.forEach(t=>{
@@ -807,7 +808,7 @@ function renderTxnList(container, list){
         <div class="txn-cat">${escapeHtml(t.category||'Uncategorized')}</div>
         <div class="txn-note">${escapeHtml(t.note||'')}</div>
         <div class="txn-tags">${t.tags && t.tags.length? '#'+t.tags.map(escapeHtml).join(' #')+' &middot; ':''}${t.recordedBy? '<span class="by-tag">'+escapeHtml(t.recordedBy)+'</span>' : ''}</div>
-        <div class="txn-date-small">${formatDate(t.date)} ${t.time||''}</div>
+        <div class="txn-date-small">${formatDate(t.date)}</div>
       </div>
       <div class="txn-amount ${t.type}">${t.type==='income'?'+':'-'}${fmtMoney(t.amount)}</div>
     `;
@@ -1039,16 +1040,42 @@ function suggestCategoryFromNote(note){
 }
 
 /* ================= MODAL: ADD/EDIT TRANSACTION ================= */
+function getFrequentCategories(type){
+  const all = type==='income' ? state.categories.income : state.categories.expense;
+  const usage = {};
+  state.transactions.filter(t=>t.type===type).forEach(t=>{
+    if(!usage[t.category]) usage[t.category] = { count:0, last:'' };
+    usage[t.category].count++;
+    if(t.date > usage[t.category].last) usage[t.category].last = t.date;
+  });
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-45);
+  const cutoffIso = isoDate(cutoff);
+  let recent = all.filter(c => usage[c] && usage[c].last >= cutoffIso);
+  recent.sort((a,b)=> usage[b].last.localeCompare(usage[a].last));
+  if(recent.length===0){
+    recent = all.filter(c=>usage[c]).sort((a,b)=> usage[b].count-usage[a].count).slice(0,10);
+  }
+  return recent;
+}
+
 function populateFormSelects(){
   const catSel = document.getElementById('fCategory');
-  const cats = state.txnTypeInForm==='income' ? state.categories.income : state.categories.expense;
+  const type = state.txnTypeInForm;
+  const allCats = type==='income' ? state.categories.income : state.categories.expense;
+  let cats = state._showAllCategories ? allCats.slice() : getFrequentCategories(type);
+
+  const editingTxn = state.editingId ? state.transactions.find(t=>t.id===state.editingId) : null;
+  if(editingTxn && editingTxn.category && !cats.includes(editingTxn.category)){
+    cats = [editingTxn.category, ...cats];
+  }
+  if(cats.length===0) cats = allCats.slice();
+
   catSel.innerHTML = cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('') + `<option value="__new__">+ Add new category</option>`;
-  document.getElementById('fCategoryLabel').textContent = state.txnTypeInForm==='income' ? 'Category / Booth Location' : 'Expense Category';
+  document.getElementById('fCategoryLabel').textContent = type==='income' ? 'Category / Booth Location' : 'Expense Category';
+  const toggleEl = document.getElementById('toggleAllCategories');
+  if(toggleEl) toggleEl.textContent = state._showAllCategories ? 'Show frequent only' : `Show all (${allCats.length})`;
 
-  const accSel = document.getElementById('fAccount');
-  accSel.innerHTML = state.accounts.map(a=>`<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('');
-
-  document.getElementById('fRecipientWrap').style.display = state.txnTypeInForm==='expense' ? 'block' : 'none';
+  document.getElementById('fRecipientWrap').style.display = type==='expense' ? 'block' : 'none';
 
   renderRecordedByButtons();
 }
@@ -1076,19 +1103,17 @@ function setFormType(type){
 
 function openAddModal(prefillDate){
   state.editingId = null;
+  state._showAllCategories = false;
   state._formRecordedBy = state.currentUser || state.users[0] || '';
   document.getElementById('modalTitle').textContent = 'Add Transaction';
   document.getElementById('btnDelete').classList.add('hidden');
   setFormType('income');
   document.getElementById('fAmount').value='';
   document.getElementById('fDate').value = prefillDate || todayIso();
-  const now = new Date();
-  document.getElementById('fTime').value = pad2(now.getHours())+':'+pad2(now.getMinutes());
   document.getElementById('fNote').value='';
   document.getElementById('fTags').value='';
   document.getElementById('fRecipient').value='';
   document.getElementById('autoTag').classList.add('hidden');
-  document.getElementById('voiceStatus').classList.add('hidden');
   document.getElementById('modalAdd').classList.remove('hidden');
 }
 
@@ -1096,17 +1121,16 @@ function openEditModal(id){
   const t = state.transactions.find(x=>x.id===id);
   if(!t) return;
   state.editingId = id;
+  state._showAllCategories = false;
   state._formRecordedBy = t.recordedBy || state.currentUser || state.users[0] || '';
   document.getElementById('modalTitle').textContent = 'Edit Transaction';
   document.getElementById('btnDelete').classList.remove('hidden');
   setFormType(t.type);
   document.getElementById('fAmount').value = t.amount;
   document.getElementById('fDate').value = t.date;
-  document.getElementById('fTime').value = t.time;
   document.getElementById('fCategory').value = t.category;
   document.getElementById('fNote').value = t.note||'';
   document.getElementById('fTags').value = (t.tags||[]).join(', ');
-  document.getElementById('fAccount').value = t.account||state.accounts[0];
   document.getElementById('fRecipient').value = t.recipient||'';
   document.getElementById('modalAdd').classList.remove('hidden');
 }
@@ -1133,14 +1157,12 @@ function handleCategoryChange(){
 }
 
 async function saveTxn(){
-  const amount = parseFloat(document.getElementById('fAmount').value);
-  if(!amount || amount<=0){ showToast('Please enter a valid amount'); return; }
+  const amount = evalAmountExpr(document.getElementById('fAmount').value);
+  if(isNaN(amount) || amount<=0){ showToast('Please enter a valid amount (e.g. 500 or 50+30+20)'); return; }
   const date = document.getElementById('fDate').value || todayIso();
-  const time = document.getElementById('fTime').value || '00:00';
   const category = document.getElementById('fCategory').value || 'Other';
   const note = document.getElementById('fNote').value.trim();
   const tags = document.getElementById('fTags').value.split(',').map(s=>s.trim()).filter(Boolean);
-  const account = document.getElementById('fAccount').value;
   const recipient = document.getElementById('fRecipient').value.trim();
   const recordedBy = state._formRecordedBy || '';
 
@@ -1153,10 +1175,12 @@ async function saveTxn(){
   try{
     if(state.editingId){
       const t = state.transactions.find(x=>x.id===state.editingId);
-      Object.assign(t, {amount, date, time, category, note, tags, account, recipient, recordedBy, type: state.txnTypeInForm});
+      Object.assign(t, {amount, date, category, note, tags, recipient, recordedBy, type: state.txnTypeInForm});
       const { error } = await sb.from('transactions').update(txnToRow(t)).eq('id', t.id);
       if(error) throw error;
     } else {
+      const time = nowTimeStr();
+      const account = state.accounts[0] || 'Cash';
       const t = { id: uid(), type: state.txnTypeInForm, amount, date, time, category, tags, note, account, recipient, recordedBy };
       state.transactions.push(t);
       const { error } = await sb.from('transactions').insert(txnToRow(t));
@@ -1198,71 +1222,6 @@ function onNoteInput(){
     }
   }
   tagEl.classList.add('hidden');
-}
-
-/* ================= VOICE INPUT ================= */
-let recognition = null;
-function initVoice(){
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const micBtn = document.getElementById('btnMic');
-  if(!SR){
-    micBtn.style.opacity = '0.4';
-    micBtn.title = 'This browser does not support voice input';
-    micBtn.addEventListener('click', ()=> showToast('Voice input is not supported in this browser. Try Chrome or type manually.'));
-    return;
-  }
-  recognition = new SR();
-  recognition.lang = 'en-US';
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-
-  micBtn.addEventListener('click', ()=>{
-    try{ recognition.start(); }catch(e){}
-    micBtn.classList.add('listening');
-    const statusEl = document.getElementById('voiceStatus');
-    statusEl.classList.remove('hidden');
-    statusEl.textContent = 'Listening... try saying "Expense coffee beans 1500 baht"';
-  });
-
-  recognition.onresult = (e)=>{
-    const transcript = e.results[0][0].transcript;
-    parseVoiceTranscript(transcript);
-  };
-  recognition.onerror = (e)=>{
-    document.getElementById('voiceStatus').textContent = "Couldn't hear clearly. Try again or type manually.";
-  };
-  recognition.onend = ()=>{
-    micBtn.classList.remove('listening');
-  };
-}
-
-function parseVoiceTranscript(text){
-  const statusEl = document.getElementById('voiceStatus');
-  statusEl.textContent = `Heard: "${text}"`;
-
-  const expenseWords = ['spent','paid','expense','bought','cost','purchase'];
-  const incomeWords = ['income','received','sold','earned','revenue'];
-  const lowerText = text.toLowerCase();
-  let type = state.txnTypeInForm;
-  if(expenseWords.some(w=>lowerText.includes(w))) type = 'expense';
-  else if(incomeWords.some(w=>lowerText.includes(w))) type = 'income';
-  setFormType(type);
-
-  const match = text.match(/([\d,]+(?:\.\d+)?)/);
-  if(match){
-    const amt = parseFloat(match[1].replace(/,/g,''));
-    if(!isNaN(amt)) document.getElementById('fAmount').value = amt;
-  }
-
-  const cats = type==='income' ? state.categories.income : state.categories.expense;
-  const foundCat = cats.find(c => lowerText.includes(c.toLowerCase()));
-  if(foundCat) document.getElementById('fCategory').value = foundCat;
-
-  let noteText = text.replace(match ? match[0] : '', '').replace(/baht/gi,'').trim();
-  document.getElementById('fNote').value = noteText || text;
-  onNoteInput();
-
-  statusEl.textContent += ' — Review the details above and tap "Save"';
 }
 
 /* ================= SETTINGS ================= */
@@ -1458,6 +1417,20 @@ function bindEvents(){
   document.getElementById('fNote').addEventListener('input', onNoteInput);
   document.getElementById('btnSaveTxn').addEventListener('click', saveTxn);
   document.getElementById('btnDelete').addEventListener('click', deleteTxn);
+  document.getElementById('fAmount').addEventListener('blur', ()=>{
+    const el = document.getElementById('fAmount');
+    if(el.value && el.value.includes('+')){
+      const sum = evalAmountExpr(el.value);
+      if(!isNaN(sum)) el.value = (Math.round(sum*100)/100).toString();
+    }
+  });
+  const toggleAllCatsBtn = document.getElementById('toggleAllCategories');
+  if(toggleAllCatsBtn){
+    toggleAllCatsBtn.addEventListener('click', ()=>{
+      state._showAllCategories = !state._showAllCategories;
+      populateFormSelects();
+    });
+  }
 
   document.getElementById('searchBox').addEventListener('input', renderFullList);
   document.getElementById('filterType').addEventListener('change', renderFullList);
@@ -1593,7 +1566,6 @@ async function finishBoot(){
 
 async function init(){
   bindEvents();
-  initVoice();
   try{
     await loadSettings();
   }catch(err){
