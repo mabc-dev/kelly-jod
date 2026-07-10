@@ -111,10 +111,12 @@ main{padding:14px 16px 8px;}
 /* CALENDAR */
 .cal-weekday-row{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:10.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
-.cal-cell{aspect-ratio:1/1;border-radius:10px;background:var(--surface);border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;cursor:pointer;position:relative;}
+.cal-cell{aspect-ratio:1/1;border-radius:10px;background:var(--surface);border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;cursor:pointer;position:relative;touch-action:none;user-select:none;-webkit-user-select:none;}
 .cal-cell.empty{background:transparent;box-shadow:none;border:none;cursor:default;}
 .cal-cell.selected{outline:2px solid var(--ink);}
 .cal-cell.today{border:1.5px solid var(--ink);}
+.cal-hint{font-size:10.5px;color:var(--muted);text-align:center;margin:8px 0 10px;}
+.cal-range-summary{margin-bottom:14px;}
 .cal-daynum{font-weight:600;}
 .cal-net{font-size:8.5px;margin-top:2px;font-weight:700;}
 .cal-net.pos{color:var(--ink);}
@@ -267,7 +269,7 @@ main{padding:14px 16px 8px;}
         <span class="paw">●</span>
         <div>
           <div class="brand-title">Kelly Jod <span class="pro-badge">PRO</span></div>
-          <div class="brand-sub">MABC Roastco · Mix Puridej Rungwongsakul</div>
+          <div class="brand-sub">MABC CO.,LTD</div>
         </div>
       </div>
       <button id="btn-search" class="icon-btn" title="Search">⌕</button>
@@ -330,6 +332,13 @@ main{padding:14px 16px 8px;}
         <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
       </div>
       <div id="calGrid" class="cal-grid"></div>
+      <div class="cal-hint">Tap a date, or drag across multiple dates to sum a range</div>
+      <div id="calRangeSummary" class="week-box cal-range-summary">
+        <div class="week-title" id="calRangeLabel">SELECT A DATE</div>
+        <div class="week-row"><span>Income</span><b id="calRangeIncome">0</b></div>
+        <div class="week-row"><span>Expense</span><b id="calRangeExpense">0</b></div>
+        <div class="week-row"><span>Net</span><b id="calRangeNet">0</b></div>
+      </div>
       <div class="section-title" id="calDayTitle">Tap a date to see transactions</div>
       <div id="calDayList" class="txn-list"></div>
     </section>
@@ -564,7 +573,8 @@ let state = {
   users: ['User'],
   currentUser: '',
   currentMonth: new Date(),
-  selectedDay: null,
+  rangeStart: null,
+  rangeEnd: null,
   view: 'home',
   editingId: null,
   txnTypeInForm: 'income',
@@ -834,6 +844,14 @@ function escapeHtml(s){
 }
 
 /* ================= CALENDAR ================= */
+let isDraggingCal = false;
+
+function calRangeBounds(){
+  if(!state.rangeStart || !state.rangeEnd) return null;
+  const a = state.rangeStart, b = state.rangeEnd;
+  return a <= b ? {lo:a, hi:b} : {lo:b, hi:a};
+}
+
 function renderCalendar(){
   const grid = document.getElementById('calGrid');
   grid.innerHTML='';
@@ -868,21 +886,27 @@ function renderCalendar(){
     grid.appendChild(cell);
   }
   const todayStr = todayIso();
+  const range = calRangeBounds();
   for(let day=1; day<=daysInMonth; day++){
     const dateObj = new Date(d.getFullYear(), d.getMonth(), day);
     const iso = isoDate(dateObj);
     const cell = document.createElement('div');
+    cell.dataset.iso = iso;
     const info = dayMap[iso];
     const tier = info ? tierClass(info.income) : '';
-    cell.className = 'cal-cell' + (tier? ' '+tier:'') + (iso===todayStr? ' today':'') + (iso===state.selectedDay? ' selected':'');
+    const inRangeSel = range && iso >= range.lo && iso <= range.hi;
+    cell.className = 'cal-cell' + (tier? ' '+tier:'') + (iso===todayStr? ' today':'') + (inRangeSel? ' selected':'');
     let netHtml = '';
     if(info){
       const net = info.income - info.expense;
       netHtml = `<div class="cal-net ${net>=0?'pos':'neg'}">${net>=0?'+':''}${fmtMoney(Math.round(net))}</div>`;
     }
     cell.innerHTML = `<div class="cal-daynum">${day}</div>${netHtml}`;
-    cell.addEventListener('click', ()=>{
-      state.selectedDay = iso;
+    cell.addEventListener('pointerdown', (e)=>{
+      e.preventDefault();
+      isDraggingCal = true;
+      state.rangeStart = iso;
+      state.rangeEnd = iso;
       renderCalendar();
       renderCalendarDayList();
     });
@@ -890,17 +914,47 @@ function renderCalendar(){
   }
 }
 
+function calHandlePointerMove(clientX, clientY){
+  if(!isDraggingCal) return;
+  const el = document.elementFromPoint(clientX, clientY);
+  if(el && el.classList && el.classList.contains('cal-cell') && el.dataset.iso){
+    if(state.rangeEnd !== el.dataset.iso){
+      state.rangeEnd = el.dataset.iso;
+      renderCalendar();
+      renderCalendarDayList();
+    }
+  }
+}
+
 function renderCalendarDayList(){
   const title = document.getElementById('calDayTitle');
   const list = document.getElementById('calDayList');
-  if(!state.selectedDay){
+  const range = calRangeBounds();
+
+  document.getElementById('calRangeLabel').textContent = range
+    ? (range.lo===range.hi ? formatDate(range.lo).toUpperCase() : (formatDate(range.lo)+' – '+formatDate(range.hi)).toUpperCase())
+    : 'SELECT A DATE';
+
+  if(!range){
+    document.getElementById('calRangeIncome').textContent = '0';
+    document.getElementById('calRangeExpense').textContent = '0';
+    document.getElementById('calRangeNet').textContent = '0';
     title.textContent = 'Tap a date to see transactions';
     list.innerHTML='';
     return;
   }
-  title.textContent = 'Transactions on ' + formatDate(state.selectedDay);
-  const dayTxns = state.transactions.filter(t=>t.date===state.selectedDay)
-    .sort((a,b)=> (a.time||'').localeCompare(b.time||''));
+
+  const rangeTxns = state.transactions.filter(t=> t.date >= range.lo && t.date <= range.hi);
+  const rIncome = sumByType(rangeTxns,'income');
+  const rExpense = sumByType(rangeTxns,'expense');
+  document.getElementById('calRangeIncome').textContent = fmtMoney(rIncome);
+  document.getElementById('calRangeExpense').textContent = fmtMoney(rExpense);
+  document.getElementById('calRangeNet').textContent = fmtMoneySigned(rIncome-rExpense);
+
+  title.textContent = range.lo===range.hi
+    ? 'Transactions on ' + formatDate(range.lo)
+    : 'Transactions from ' + formatDate(range.lo) + ' to ' + formatDate(range.hi);
+  const dayTxns = rangeTxns.slice().sort((a,b)=> (a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
   renderTxnList(list, dayTxns);
 }
 
@@ -966,6 +1020,28 @@ function getAnalyticsRangeTxns(){
 
 const GRAYS = ['#000000','#333333','#555555','#777777','#999999','#aaaaaa','#bbbbbb','#cccccc','#1a1a1a','#666666'];
 
+/* Custom Chart.js plugin: draws the exact revenue number at the end of each horizontal bar. */
+const revenueValueLabelPlugin = {
+  id: 'revenueValueLabel',
+  afterDatasetsDraw(chart){
+    const { ctx } = chart;
+    const meta = chart.getDatasetMeta(0);
+    const data = chart.data.datasets[0].data;
+    ctx.save();
+    ctx.font = '700 10px Inter, -apple-system, sans-serif';
+    ctx.fillStyle = '#111111';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    meta.data.forEach((bar, i)=>{
+      const val = data[i];
+      if(val === undefined || val === null) return;
+      const label = fmtMoney(val);
+      ctx.fillText(label, bar.x + 6, bar.y);
+    });
+    ctx.restore();
+  }
+};
+
 function renderAnalytics(){
   const list = getAnalyticsRangeTxns();
 
@@ -975,10 +1051,17 @@ function renderAnalytics(){
 
   const ctx1 = document.getElementById('chartTopLocations').getContext('2d');
   if(chartTopLocations) chartTopLocations.destroy();
+  const topLocMax = topLoc.length ? Math.max(...topLoc.map(x=>x[1])) : 0;
   chartTopLocations = new Chart(ctx1, {
     type:'bar',
     data:{ labels: topLoc.map(x=>x[0]), datasets:[{ label:'Income (THB)', data: topLoc.map(x=>x[1]), backgroundColor:'#111111', borderRadius:4 }] },
-    options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{font:{size:9}}}, y:{ticks:{font:{size:9}}}} }
+    options:{
+      indexAxis:'y',
+      plugins:{legend:{display:false}},
+      scales:{ x:{ ticks:{font:{size:9}}, suggestedMax: topLocMax * 1.28 }, y:{ticks:{font:{size:9}}} },
+      layout:{ padding:{ right: 8 } }
+    },
+    plugins:[revenueValueLabelPlugin]
   });
 
   const expByCat = {};
@@ -1394,14 +1477,20 @@ function renderAll(){
 function bindEvents(){
   document.getElementById('prevMonth').addEventListener('click', ()=>{
     state.currentMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth()-1, 1);
-    state.selectedDay=null;
+    state.rangeStart=null; state.rangeEnd=null;
     renderAll();
   });
   document.getElementById('nextMonth').addEventListener('click', ()=>{
     state.currentMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth()+1, 1);
-    state.selectedDay=null;
+    state.rangeStart=null; state.rangeEnd=null;
     renderAll();
   });
+
+  document.addEventListener('pointermove', (e)=>{
+    if(isDraggingCal) calHandlePointerMove(e.clientX, e.clientY);
+  }, {passive:true});
+  document.addEventListener('pointerup', ()=>{ isDraggingCal = false; });
+  document.addEventListener('pointercancel', ()=>{ isDraggingCal = false; });
 
   document.querySelectorAll('.nav-btn').forEach(btn=>{
     btn.addEventListener('click', ()=> switchView(btn.getAttribute('data-view')));
