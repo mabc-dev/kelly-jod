@@ -76,6 +76,7 @@ main{padding:14px 16px 8px;}
 .card-net .card-value{color:var(--ink);}
 
 .week-strip{margin:10px 0;}
+.ytd-box{background:#fff;border:1px solid var(--border);}
 .week-box{background:var(--surface-2);border-radius:var(--radius);padding:12px 14px;}
 .week-title{font-size:11px;color:var(--muted);font-weight:700;margin-bottom:6px;letter-spacing:0.4px;}
 .week-row{display:flex;justify-content:space-between;font-size:13px;padding:2px 0;}
@@ -147,6 +148,22 @@ main{padding:14px 16px 8px;}
 .range-tabs button{flex:1 1 auto;min-width:60px;padding:8px 4px;border-radius:10px;border:1px solid var(--border);background:var(--surface);font-family:inherit;font-size:11px;cursor:pointer;color:var(--text);}
 .range-tabs button.active{background:var(--ink);color:#fff;border-color:var(--ink);}
 .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px;box-shadow:var(--shadow);}
+.chart-card.ac-1{border-top:3px solid #4F9D7A;}
+.chart-card.ac-2{border-top:3px solid #D9735B;}
+.chart-card.ac-3{border-top:3px solid #5B8DB8;}
+.chart-card.ac-4{border-top:3px solid #C9A227;}
+.an-kpis{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;}
+.an-kpi{border-radius:var(--radius);padding:10px 8px;text-align:center;display:flex;flex-direction:column;gap:3px;}
+.an-kpi span{font-size:10px;text-transform:uppercase;letter-spacing:0.3px;font-weight:600;}
+.an-kpi b{font-size:15px;}
+.an-inc{background:#E8F3EC;color:#2F6B4F;}
+.an-exp{background:#FBEAE5;color:#A44B36;}
+.an-net{background:#E7EFF7;color:#2F5C85;}
+.loc-row:nth-child(5n+1) .loc-rank{color:#4F9D7A;font-weight:700;}
+.loc-row:nth-child(5n+2) .loc-rank{color:#5B8DB8;font-weight:700;}
+.loc-row:nth-child(5n+3) .loc-rank{color:#D98C5F;font-weight:700;}
+.loc-row:nth-child(5n+4) .loc-rank{color:#9B7BB3;font-weight:700;}
+.loc-row:nth-child(5n+5) .loc-rank{color:#C9A227;font-weight:700;}
 .chart-title{font-size:12.5px;font-weight:700;margin-bottom:10px;color:var(--ink);text-transform:uppercase;letter-spacing:0.3px;}
 .loc-search{width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--border);font-family:inherit;font-size:12px;margin-bottom:10px;}
 .loc-table{display:flex;flex-direction:column;gap:6px;font-size:12px;}
@@ -172,7 +189,6 @@ main{padding:14px 16px 8px;}
 .budget-cat-row span{flex:1;font-size:12px;}
 .budget-cat-row input{width:90px;margin-bottom:0;}
 .about-block p{font-size:12px;color:var(--muted);line-height:1.6;margin:0;}
-.personal-note{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:4px;}
 
 /* FAB + NAV */
 .fab{position:fixed;right:calc(50% - 250px + 20px);bottom:78px;width:56px;height:56px;border-radius:50%;background:var(--ink);color:#fff;font-size:26px;border:none;box-shadow:0 6px 16px rgba(0,0,0,0.3);cursor:pointer;z-index:30;line-height:1;}
@@ -315,6 +331,15 @@ main{padding:14px 16px 8px;}
         </div>
       </div>
 
+      <div class="week-strip">
+        <div class="week-box ytd-box">
+          <div class="week-title" id="ytdTitleHome">YEAR TO DATE</div>
+          <div class="week-row"><span>Income</span><b id="ytdIncomeHome">0</b></div>
+          <div class="week-row"><span>Expense</span><b id="ytdExpenseHome">0</b></div>
+          <div class="week-row"><span>Net</span><b id="ytdNetHome">0</b></div>
+        </div>
+      </div>
+
       <div class="section-title">Budget this month</div>
       <div id="budgetOverview" class="budget-overview"></div>
 
@@ -339,6 +364,12 @@ main{padding:14px 16px 8px;}
         <div class="week-row"><span>Income</span><b id="calRangeIncome">0</b></div>
         <div class="week-row"><span>Expense</span><b id="calRangeExpense">0</b></div>
         <div class="week-row"><span>Net</span><b id="calRangeNet">0</b></div>
+      </div>
+      <div class="week-box ytd-box" style="margin-top:10px;">
+        <div class="week-title" id="ytdTitleCal">YEAR TO DATE</div>
+        <div class="week-row"><span>Income</span><b id="ytdIncomeCal">0</b></div>
+        <div class="week-row"><span>Expense</span><b id="ytdExpenseCal">0</b></div>
+        <div class="week-row"><span>Net</span><b id="ytdNetCal">0</b></div>
       </div>
       <div class="section-title" id="calDayTitle">Tap a date to see transactions</div>
       <div id="calDayList" class="txn-list"></div>
@@ -367,32 +398,6 @@ main{padding:14px 16px 8px;}
       <div id="fullList" class="txn-list"></div>
     </section>
 
-    <!-- PERSONAL -->
-    <section id="view-personal" class="view">
-      <div class="personal-note">Your own spending, kept separate from MABC company books. Still visible to both Mix and Anne, just a different ledger.</div>
-      <div class="section-title">Personal — This Month</div>
-      <div class="summary-cards">
-        <div class="card card-income">
-          <div class="card-label">Income this month</div>
-          <div class="card-value" id="pSumIncome">0</div>
-        </div>
-        <div class="card card-expense">
-          <div class="card-label">Expense this month</div>
-          <div class="card-value" id="pSumExpense">0</div>
-        </div>
-        <div class="card card-net">
-          <div class="card-label">Net balance</div>
-          <div class="card-value" id="pSumNet">0</div>
-        </div>
-      </div>
-
-      <div class="section-title">Recent Personal Transactions</div>
-      <div id="personalRecentList" class="txn-list"></div>
-
-      <div class="section-title">All Personal Transactions</div>
-      <div id="personalFullList" class="txn-list"></div>
-    </section>
-
     <!-- ANALYTICS -->
     <section id="view-analytics" class="view">
       <div class="range-tabs" id="rangeTabs">
@@ -403,22 +408,28 @@ main{padding:14px 16px 8px;}
         <button data-range="all">All Time</button>
       </div>
 
-      <div class="chart-card">
+      <div class="an-kpis">
+        <div class="an-kpi an-inc"><span>Income</span><b id="anIncome">0</b></div>
+        <div class="an-kpi an-exp"><span>Expense</span><b id="anExpense">0</b></div>
+        <div class="an-kpi an-net"><span>Net</span><b id="anNet">0</b></div>
+      </div>
+
+      <div class="chart-card ac-1">
         <div class="chart-title">Top Locations / Events by Revenue</div>
         <canvas id="chartTopLocations" height="220"></canvas>
       </div>
 
-      <div class="chart-card">
+      <div class="chart-card ac-2">
         <div class="chart-title">Expense Breakdown by Category</div>
         <canvas id="chartExpensePie" height="220"></canvas>
       </div>
 
-      <div class="chart-card">
+      <div class="chart-card ac-3">
         <div class="chart-title">Monthly Income vs Expense Trend</div>
         <canvas id="chartTrend" height="220"></canvas>
       </div>
 
-      <div class="chart-card">
+      <div class="chart-card ac-4">
         <div class="chart-title">Location Summary Table</div>
         <input id="locSearch" type="text" placeholder="Filter by location name..." class="loc-search">
         <div id="locationTable" class="loc-table"></div>
@@ -450,24 +461,6 @@ main{padding:14px 16px 8px;}
         <div class="add-row">
           <input id="newCatExpense" type="text" placeholder="Add new expense category...">
           <button class="btn-small" data-add="expense">Add</button>
-        </div>
-      </div>
-
-      <div class="settings-block">
-        <div class="settings-head">Personal Income Categories</div>
-        <div id="personalCatIncomeList" class="chip-list"></div>
-        <div class="add-row">
-          <input id="newPersonalCatIncome" type="text" placeholder="Add new personal income category...">
-          <button class="btn-small" data-add="personalIncome">Add</button>
-        </div>
-      </div>
-
-      <div class="settings-block">
-        <div class="settings-head">Personal Expense Categories</div>
-        <div id="personalCatExpenseList" class="chip-list"></div>
-        <div class="add-row">
-          <input id="newPersonalCatExpense" type="text" placeholder="Add new personal expense category...">
-          <button class="btn-small" data-add="personalExpense">Add</button>
         </div>
       </div>
 
@@ -523,7 +516,6 @@ main{padding:14px 16px 8px;}
     <button class="nav-btn active" data-view="home"><span>⌂</span>Home</button>
     <button class="nav-btn" data-view="calendar"><span>▦</span>Calendar</button>
     <button class="nav-btn" data-view="list"><span>≡</span>Transactions</button>
-    <button class="nav-btn" data-view="personal"><span>▣</span>Personal</button>
     <button class="nav-btn" data-view="analytics"><span>▤</span>Analytics</button>
     <button class="nav-btn" data-view="settings"><span>⚙</span>Settings</button>
   </nav>
@@ -608,14 +600,10 @@ const MONTHS_FULL = ["January","February","March","April","May","June","July","A
 
 const DEFAULT_EXPENSE_CATS = ["Coffee Beans / Ingredients","Packaging","Booth / Site Rental","Transportation","Staff Wages","Marketing / Advertising","Fuel / Travel","Equipment / Maintenance","Fees","Other"];
 const DEFAULT_ACCOUNTS = ["Cash","Bank Account","Credit Card"];
-const DEFAULT_PERSONAL_INCOME_CATS = ["Salary","Side Income","Gift","Other"];
-const DEFAULT_PERSONAL_EXPENSE_CATS = ["Groceries","Rent / Mortgage","Utilities","Transport","Dining Out","Health","Shopping","Entertainment","Subscriptions","Other"];
 
 let state = {
   transactions: [],
-  personalTransactions: [],
   categories: { income: [], expense: [] },
-  personalCategories: { income: [], expense: [] },
   accounts: [],
   budgets: { overall: 0, byCategory: {} },
   noteMemory: {},
@@ -627,9 +615,7 @@ let state = {
   rangeEnd: null,
   view: 'home',
   editingId: null,
-  editingScope: 'company',
   txnTypeInForm: 'income',
-  txnScope: 'company',
   analyticsRange: 'month'
 };
 
@@ -658,7 +644,6 @@ async function loadSettings(){
   if(error) throw error;
   const s = data.data || {};
   state.categories = s.categories || { income: ["General"], expense: DEFAULT_EXPENSE_CATS.slice() };
-  state.personalCategories = s.personalCategories || { income: DEFAULT_PERSONAL_INCOME_CATS.slice(), expense: DEFAULT_PERSONAL_EXPENSE_CATS.slice() };
   state.accounts = s.accounts || DEFAULT_ACCOUNTS.slice();
   state.budgets = s.budgets || { overall: 0, byCategory: {} };
   state.noteMemory = s.noteMemory || {};
@@ -669,7 +654,6 @@ async function loadSettings(){
 async function saveSettings(){
   const payload = {
     categories: state.categories,
-    personalCategories: state.personalCategories,
     accounts: state.accounts,
     budgets: state.budgets,
     noteMemory: state.noteMemory,
@@ -686,20 +670,11 @@ async function loadTransactions(){
   state.transactions = (data || []).map(rowToTxn);
 }
 
-async function loadPersonalTransactions(){
-  const { data, error } = await sb.from('personal_transactions').select('*').order('date', { ascending: true }).order('time', { ascending: true });
-  if(error) throw error;
-  state.personalTransactions = (data || []).map(rowToTxn);
-}
-
 function subscribeRealtime(){
   if(realtimeChannel) return;
   realtimeChannel = sb.channel('transactions-sync')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
       handleRealtimeChange(payload);
-    })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'personal_transactions' }, (payload) => {
-      handlePersonalRealtimeChange(payload);
     })
     .subscribe();
 }
@@ -715,21 +690,6 @@ function handleRealtimeChange(payload){
     else state.transactions.push(rowToTxn(payload.new));
   } else if(payload.eventType === 'DELETE'){
     state.transactions = state.transactions.filter(t => t.id !== payload.old.id);
-  }
-  renderAll();
-}
-
-function handlePersonalRealtimeChange(payload){
-  if(payload.eventType === 'INSERT'){
-    if(!state.personalTransactions.find(t => t.id === payload.new.id)){
-      state.personalTransactions.push(rowToTxn(payload.new));
-    }
-  } else if(payload.eventType === 'UPDATE'){
-    const idx = state.personalTransactions.findIndex(t => t.id === payload.new.id);
-    if(idx >= 0) state.personalTransactions[idx] = rowToTxn(payload.new);
-    else state.personalTransactions.push(rowToTxn(payload.new));
-  } else if(payload.eventType === 'DELETE'){
-    state.personalTransactions = state.personalTransactions.filter(t => t.id !== payload.old.id);
   }
   renderAll();
 }
@@ -779,10 +739,9 @@ function inRange(txnDateIso, start, end){
   const d = parseIso(txnDateIso);
   return d >= start && d <= end;
 }
-function txnsForMonth(date, scope){
+function txnsForMonth(date){
   const {start,end} = monthRange(date);
-  const source = scope==='personal' ? state.personalTransactions : state.transactions;
-  return source.filter(t=>inRange(t.date,start,end));
+  return state.transactions.filter(t=>inRange(t.date,start,end));
 }
 function sumByType(list, type){
   return list.filter(t=>t.type===type).reduce((a,t)=>a+Number(t.amount),0);
@@ -820,6 +779,7 @@ function renderHome(){
   document.getElementById('weekExpense').textContent = fmtMoney(wExpense);
   document.getElementById('weekNet').textContent = fmtMoneySigned(wIncome-wExpense);
 
+  renderYTD('Home');
   renderBudgetOverview(monthTxns, expense);
   renderAlertBanner(expense);
 
@@ -830,24 +790,14 @@ function renderHome(){
   renderTxnList(document.getElementById('recentList'), recent, 'No transactions today or yesterday');
 }
 
-function renderPersonal(){
-  const monthTxns = txnsForMonth(state.currentMonth, 'personal');
-  const income = sumByType(monthTxns,'income');
-  const expense = sumByType(monthTxns,'expense');
-  const net = income - expense;
-
-  document.getElementById('pSumIncome').textContent = fmtMoney(income);
-  document.getElementById('pSumExpense').textContent = fmtMoney(expense);
-  document.getElementById('pSumNet').textContent = fmtMoneySigned(net);
-
-  const todayStr = todayIso();
-  const yestStr = isoDate(new Date(Date.now()-86400000));
-  const recent = state.personalTransactions.filter(t=> t.date===todayStr || t.date===yestStr)
-    .sort((a,b)=> (b.date+b.time+b.id).localeCompare(a.date+a.time+a.id));
-  renderTxnList(document.getElementById('personalRecentList'), recent, 'No personal transactions today or yesterday', 'personal');
-
-  const allSorted = state.personalTransactions.slice().sort((a,b)=> (b.date+b.time+b.id).localeCompare(a.date+a.time+a.id));
-  renderTxnList(document.getElementById('personalFullList'), allSorted, 'No personal transactions yet. Tap + to add one.', 'personal');
+function renderYTD(suffix){
+  const y = state.currentMonth.getFullYear();
+  const list = state.transactions.filter(t=> t.date >= y+'-01-01' && t.date <= y+'-12-31');
+  const inc = sumByType(list,'income'), exp = sumByType(list,'expense');
+  document.getElementById('ytdTitle'+suffix).textContent = 'YEAR TO DATE · ' + y;
+  document.getElementById('ytdIncome'+suffix).textContent = fmtMoney(inc);
+  document.getElementById('ytdExpense'+suffix).textContent = fmtMoney(exp);
+  document.getElementById('ytdNet'+suffix).textContent = fmtMoneySigned(inc-exp);
 }
 
 function setDelta(elId, cur, prev){
@@ -909,7 +859,7 @@ function budgetRowHtml(label, spend, budget){
 /* ================= TRANSACTION LIST RENDER ================= */
 function categoryIcon(type){ return type==='income' ? '+' : '−'; }
 
-function renderTxnList(container, list, emptyMessage, scope){
+function renderTxnList(container, list, emptyMessage){
   container.innerHTML='';
   if(list.length===0){
     container.innerHTML = '<div class="empty-hint">'+escapeHtml(emptyMessage||'No transactions yet')+'</div>';
@@ -928,7 +878,7 @@ function renderTxnList(container, list, emptyMessage, scope){
       </div>
       <div class="txn-amount ${t.type}">${t.type==='income'?'+':'-'}${fmtMoney(t.amount)}</div>
     `;
-    item.addEventListener('click', ()=> openEditModal(t.id, scope||'company'));
+    item.addEventListener('click', ()=> openEditModal(t.id));
     container.appendChild(item);
   });
 }
@@ -1026,6 +976,7 @@ function calHandlePointerMove(clientX, clientY){
 }
 
 function renderCalendarDayList(){
+  renderYTD('Cal');
   const title = document.getElementById('calDayTitle');
   const list = document.getElementById('calDayList');
   const range = calRangeBounds();
@@ -1117,7 +1068,8 @@ function getAnalyticsRangeTxns(){
   return state.transactions.filter(t=> inRange(t.date, start, end));
 }
 
-const GRAYS = ['#000000','#333333','#555555','#777777','#999999','#aaaaaa','#bbbbbb','#cccccc','#1a1a1a','#666666'];
+const PALETTE = ['#4F9D7A','#5B8DB8','#D98C5F','#9B7BB3','#C9A227','#D9735B','#4FA3A5','#B58863','#8FA6C4','#A3B18A'];
+const GRAYS_UNUSED = ['#000000','#333333','#555555','#777777','#999999','#aaaaaa','#bbbbbb','#cccccc','#1a1a1a','#666666'];
 
 /* Custom Chart.js plugin: draws the exact revenue number at the end of each horizontal bar. */
 const revenueValueLabelPlugin = {
@@ -1143,6 +1095,10 @@ const revenueValueLabelPlugin = {
 
 function renderAnalytics(){
   const list = getAnalyticsRangeTxns();
+  const aInc = sumByType(list,'income'), aExp = sumByType(list,'expense');
+  document.getElementById('anIncome').textContent = fmtMoney(aInc);
+  document.getElementById('anExpense').textContent = fmtMoney(aExp);
+  document.getElementById('anNet').textContent = fmtMoneySigned(aInc-aExp);
 
   const incomeByCat = {};
   list.filter(t=>t.type==='income').forEach(t=>{ incomeByCat[t.category] = (incomeByCat[t.category]||0) + Number(t.amount); });
@@ -1153,7 +1109,7 @@ function renderAnalytics(){
   const topLocMax = topLoc.length ? Math.max(...topLoc.map(x=>x[1])) : 0;
   chartTopLocations = new Chart(ctx1, {
     type:'bar',
-    data:{ labels: topLoc.map(x=>x[0]), datasets:[{ label:'Income (THB)', data: topLoc.map(x=>x[1]), backgroundColor:'#111111', borderRadius:4 }] },
+    data:{ labels: topLoc.map(x=>x[0]), datasets:[{ label:'Income (THB)', data: topLoc.map(x=>x[1]), backgroundColor: topLoc.map((_,i)=>PALETTE[i%PALETTE.length]), borderRadius:4 }] },
     options:{
       indexAxis:'y',
       plugins:{legend:{display:false}},
@@ -1170,7 +1126,7 @@ function renderAnalytics(){
   if(chartExpensePie) chartExpensePie.destroy();
   chartExpensePie = new Chart(ctx2, {
     type:'doughnut',
-    data:{ labels: expEntries.map(x=>x[0]), datasets:[{ data: expEntries.map(x=>x[1]), backgroundColor: GRAYS, borderColor:'#ffffff', borderWidth:1.5 }] },
+    data:{ labels: expEntries.map(x=>x[0]), datasets:[{ data: expEntries.map(x=>x[1]), backgroundColor: expEntries.map((_,i)=>PALETTE[i%PALETTE.length]), borderColor:'#ffffff', borderWidth:2 }] },
     options:{ plugins:{legend:{position:'bottom', labels:{font:{size:9}, color:'#111111'}}} }
   });
 
@@ -1186,8 +1142,8 @@ function renderAnalytics(){
     data:{
       labels: months.map(m=> MONTHS[m.getMonth()]+' '+(m.getFullYear()%100)),
       datasets:[
-        { label:'Income', data: trendIncome, borderColor:'#000000', backgroundColor:'rgba(0,0,0,0.06)', fill:true, tension:.3, pointStyle:'circle', pointRadius:3 },
-        { label:'Expense', data: trendExpense, borderColor:'#000000', borderDash:[6,4], backgroundColor:'rgba(0,0,0,0.02)', fill:true, tension:.3, pointStyle:'rectRot', pointRadius:3 }
+        { label:'Income', data: trendIncome, borderColor:'#4F9D7A', backgroundColor:'rgba(79,157,122,0.12)', pointBackgroundColor:'#4F9D7A', fill:true, tension:.3, pointStyle:'circle', pointRadius:3 },
+        { label:'Expense', data: trendExpense, borderColor:'#D9735B', backgroundColor:'rgba(217,115,91,0.08)', pointBackgroundColor:'#D9735B', fill:true, tension:.3, pointStyle:'circle', pointRadius:3 }
       ]
     },
     options:{ plugins:{legend:{labels:{font:{size:10}, color:'#111111'}}}, scales:{x:{ticks:{font:{size:8}}}, y:{ticks:{font:{size:8}}}} }
@@ -1229,9 +1185,9 @@ function suggestCategoryFromNote(note){
 }
 
 /* ================= MODAL: ADD/EDIT TRANSACTION ================= */
-function getFrequentCategories(type, scope){
-  const catSource = scope==='personal' ? state.personalCategories : state.categories;
-  const txnSource = scope==='personal' ? state.personalTransactions : state.transactions;
+function getFrequentCategories(type){
+  const catSource = state.categories;
+  const txnSource = state.transactions;
   const all = type==='income' ? catSource.income : catSource.expense;
   const usage = {};
   txnSource.filter(t=>t.type===type).forEach(t=>{
@@ -1252,24 +1208,18 @@ function getFrequentCategories(type, scope){
 function populateFormSelects(){
   const catSel = document.getElementById('fCategory');
   const type = state.txnTypeInForm;
-  const scope = state.txnScope;
-  const catSource = scope==='personal' ? state.personalCategories : state.categories;
+  const catSource = state.categories;
   const allCats = type==='income' ? catSource.income : catSource.expense;
-  let cats = state._showAllCategories ? allCats.slice() : getFrequentCategories(type, scope);
+  let cats = state._showAllCategories ? allCats.slice() : getFrequentCategories(type);
 
-  const editingSource = state.editingScope==='personal' ? state.personalTransactions : state.transactions;
-  const editingTxn = state.editingId ? editingSource.find(t=>t.id===state.editingId) : null;
+  const editingTxn = state.editingId ? state.transactions.find(t=>t.id===state.editingId) : null;
   if(editingTxn && editingTxn.category && !cats.includes(editingTxn.category)){
     cats = [editingTxn.category, ...cats];
   }
   if(cats.length===0) cats = allCats.slice();
 
   catSel.innerHTML = cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('') + `<option value="__new__">+ Add new category</option>`;
-  if(scope==='personal'){
-    document.getElementById('fCategoryLabel').textContent = type==='income' ? 'Income Source' : 'Expense Category';
-  } else {
-    document.getElementById('fCategoryLabel').textContent = type==='income' ? 'Category / Booth Location' : 'Expense Category';
-  }
+  document.getElementById('fCategoryLabel').textContent = type==='income' ? 'Category / Booth Location' : 'Expense Category';
   const toggleEl = document.getElementById('toggleAllCategories');
   if(toggleEl) toggleEl.textContent = state._showAllCategories ? 'Show frequent only' : `Show all (${allCats.length})`;
 
@@ -1299,13 +1249,11 @@ function setFormType(type){
   populateFormSelects();
 }
 
-function openAddModal(prefillDate, scope){
+function openAddModal(prefillDate){
   state.editingId = null;
-  state.editingScope = scope || 'company';
-  state.txnScope = scope || 'company';
   state._showAllCategories = false;
   state._formRecordedBy = state.currentUser || state.users[0] || '';
-  document.getElementById('modalTitle').textContent = state.txnScope==='personal' ? 'Add Personal Transaction' : 'Add Transaction';
+  document.getElementById('modalTitle').textContent = 'Add Transaction';
   document.getElementById('btnDelete').classList.add('hidden');
   setFormType('income');
   document.getElementById('fAmount').value='';
@@ -1317,17 +1265,13 @@ function openAddModal(prefillDate, scope){
   document.getElementById('modalAdd').classList.remove('hidden');
 }
 
-function openEditModal(id, scope){
-  scope = scope || 'company';
-  const source = scope==='personal' ? state.personalTransactions : state.transactions;
-  const t = source.find(x=>x.id===id);
+function openEditModal(id){
+  const t = state.transactions.find(x=>x.id===id);
   if(!t) return;
   state.editingId = id;
-  state.editingScope = scope;
-  state.txnScope = scope;
   state._showAllCategories = false;
   state._formRecordedBy = t.recordedBy || state.currentUser || state.users[0] || '';
-  document.getElementById('modalTitle').textContent = scope==='personal' ? 'Edit Personal Transaction' : 'Edit Transaction';
+  document.getElementById('modalTitle').textContent = 'Edit Transaction';
   document.getElementById('btnDelete').classList.remove('hidden');
   setFormType(t.type);
   document.getElementById('fAmount').value = t.amount;
@@ -1345,7 +1289,7 @@ function closeModalFn(){
 
 function handleCategoryChange(){
   const sel = document.getElementById('fCategory');
-  const catTarget = state.txnScope==='personal' ? state.personalCategories : state.categories;
+  const catTarget = state.categories;
   if(sel.value==='__new__'){
     const name = prompt('New category name:');
     if(name && name.trim()){
@@ -1370,9 +1314,8 @@ async function saveTxn(){
   const tags = document.getElementById('fTags').value.split(',').map(s=>s.trim()).filter(Boolean);
   const recipient = document.getElementById('fRecipient').value.trim();
   const recordedBy = state._formRecordedBy || '';
-  const scope = state.txnScope || 'company';
-  const table = scope==='personal' ? 'personal_transactions' : 'transactions';
-  const targetArray = scope==='personal' ? state.personalTransactions : state.transactions;
+  const table = 'transactions';
+  const targetArray = state.transactions;
 
   learnNoteCategory(note, category);
   saveSettings();
@@ -1409,10 +1352,8 @@ async function deleteTxn(){
   if(!state.editingId) return;
   if(!confirm('Delete this transaction?')) return;
   const id = state.editingId;
-  const scope = state.editingScope || 'company';
-  const table = scope==='personal' ? 'personal_transactions' : 'transactions';
-  if(scope==='personal') state.personalTransactions = state.personalTransactions.filter(t=>t.id!==id);
-  else state.transactions = state.transactions.filter(t=>t.id!==id);
+  const table = 'transactions';
+  state.transactions = state.transactions.filter(t=>t.id!==id);
   closeModalFn();
   renderAll();
   const { error } = await sb.from(table).delete().eq('id', id);
@@ -1425,7 +1366,7 @@ function onNoteInput(){
   const suggestion = suggestCategoryFromNote(note);
   const tagEl = document.getElementById('autoTag');
   if(suggestion){
-    const catSource = state.txnScope==='personal' ? state.personalCategories : state.categories;
+    const catSource = state.categories;
     const cats = state.txnTypeInForm==='income' ? catSource.income : catSource.expense;
     if(cats.includes(suggestion)){
       document.getElementById('fCategory').value = suggestion;
@@ -1448,8 +1389,6 @@ function renderSettings(){
 
   renderChipList('catIncomeList', state.categories.income, 'income');
   renderChipList('catExpenseList', state.categories.expense, 'expense');
-  renderChipList('personalCatIncomeList', state.personalCategories.income, 'personalIncome');
-  renderChipList('personalCatExpenseList', state.personalCategories.expense, 'personalExpense');
   renderChipList('accountList', state.accounts, 'account');
   renderChipList('userList', state.users, 'user');
 
@@ -1465,8 +1404,6 @@ function renderChipList(containerId, items, kind){
 function removeChip(kind, item){
   if(kind==='income') state.categories.income = state.categories.income.filter(x=>x!==item);
   else if(kind==='expense') state.categories.expense = state.categories.expense.filter(x=>x!==item);
-  else if(kind==='personalIncome') state.personalCategories.income = state.personalCategories.income.filter(x=>x!==item);
-  else if(kind==='personalExpense') state.personalCategories.expense = state.personalCategories.expense.filter(x=>x!==item);
   else if(kind==='account') state.accounts = state.accounts.filter(x=>x!==item);
   else if(kind==='user') state.users = state.users.filter(x=>x!==item);
   saveSettings();
@@ -1588,13 +1525,11 @@ function switchView(view){
   if(view==='settings') renderSettings();
   if(view==='list'){ populateCategoryFilter(); renderFullList(); }
   if(view==='calendar') { renderCalendar(); renderCalendarDayList(); }
-  if(view==='personal') renderPersonal();
 }
 
 function renderAll(){
   renderMonthLabel();
   renderHome();
-  renderPersonal();
   if(state.view==='calendar'){ renderCalendar(); renderCalendarDayList(); }
   if(state.view==='list'){ populateCategoryFilter(); renderFullList(); }
   if(state.view==='analytics') renderAnalytics();
@@ -1624,9 +1559,7 @@ function bindEvents(){
     btn.addEventListener('click', ()=> switchView(btn.getAttribute('data-view')));
   });
 
-  document.getElementById('fabAdd').addEventListener('click', ()=> openAddModal(null, state.view==='personal' ? 'personal' : 'company'));
-  const fabPersonal = document.getElementById('fabAddPersonal');
-  if(fabPersonal) fabPersonal.addEventListener('click', ()=> openAddModal(null, 'personal'));
+  document.getElementById('fabAdd').addEventListener('click', ()=> openAddModal(null));
   document.getElementById('closeModal').addEventListener('click', closeModalFn);
   document.getElementById('btnCancel').addEventListener('click', closeModalFn);
   document.getElementById('modalAdd').addEventListener('click', (e)=>{
@@ -1685,7 +1618,6 @@ function bindEvents(){
       const kind = btn.getAttribute('data-add');
       const inputMap = {
         income:'newCatIncome', expense:'newCatExpense',
-        personalIncome:'newPersonalCatIncome', personalExpense:'newPersonalCatExpense',
         user:'newUser', account:'newAccount'
       };
       const inp = document.getElementById(inputMap[kind] || 'newAccount');
@@ -1693,8 +1625,6 @@ function bindEvents(){
       if(!val) return;
       if(kind==='income') state.categories.income.push(val);
       else if(kind==='expense') state.categories.expense.push(val);
-      else if(kind==='personalIncome') state.personalCategories.income.push(val);
-      else if(kind==='personalExpense') state.personalCategories.expense.push(val);
       else if(kind==='user') state.users.push(val);
       else state.accounts.push(val);
       inp.value='';
@@ -1783,7 +1713,7 @@ function proceedAfterUnlock(){
 async function finishBoot(){
   showScreen('loadingScreen');
   try{
-    await Promise.all([loadTransactions(), loadPersonalTransactions()]);
+    await loadTransactions();
   }catch(err){
     console.error(err);
     showToast('Could not load data — check your connection');
